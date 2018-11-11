@@ -7,7 +7,7 @@ module Lib
     ) where
 
 import Dhall (input, auto, Interpret)
-import Data.Text as T (Text, pack, null)
+import Data.Text as T (Text, pack, unpack, null)
 import Data.ByteString (ByteString)
 import GHC.Generics (Generic)
 import Text.Show.Functions ()
@@ -22,7 +22,7 @@ import Data.Aeson (FromJSON, encode, toJSON, pairs, (.=), object, Value)
 import Data.Aeson.Types (Pair)
 import Control.Lens ((&), (.~), (^?), (^?!), (^..), (^.), (?~))
 import Data.Aeson.Lens (key, values, _String, _Bool)
-import Data.List (find)
+import Data.List (find, intercalate)
 import Data.Map as Map (fromList)
 
 import Debug.Trace (trace)
@@ -42,25 +42,31 @@ someFunc :: FilePath -> Token -> IO ()
 someFunc inputPath apiToken = do
     input <- readInput inputPath
     traverse_ print input
-    -- channelID <- findChannelID ("tm-" ++ name $ fst input)
-    channelID <- findOrCreateChannelID "akahsa-testx" apiToken
+    traverse_ (ensureTeamState apiToken) input
+
+ensureTeamState :: Token -> InputRecord -> IO ()
+ensureTeamState apiToken record = do
+    let channelName = "tm-" <> team record
+    channelID <- findOrCreateChannelID apiToken channelName (members record)
     print channelID
 
-findOrCreateChannelID :: Text -> Token -> IO (Either Text Text)
-findOrCreateChannelID name token = do
-    currentIDResult <- findChannelID name token
+findOrCreateChannelID :: Token -> Text -> [Text] -> IO (Either Text Text)
+findOrCreateChannelID apiToken name userIDs = do
+    currentIDResult <- findChannelID name apiToken
     case currentIDResult of
       Left err -> return $ Left err
-      Right currentID -> maybe (createChannelID name token) (return . Right) currentID
+      Right currentID -> maybe (createChannelID apiToken name userIDs) (return . Right) currentID
 
-createChannelID :: Text -> Token -> IO (Either Text Text)
-createChannelID name apiToken = do
-    let params = ["name" .= name]
+createChannelID :: Token -> Text -> [Text] -> IO (Either Text Text)
+createChannelID apiToken name userIDs = do
+    let params = [ "name" .= name
+                 , "user_ids" .= intercalate "," (T.unpack <$> userIDs)
+                 ]
     resp <- slackPost apiToken params "conversations.create"
     case resp of
       Left err -> return $ Left err
       Right respBody -> do
-        let Just id = trace (show respBody) $ respBody ^? key "channel" . key "id" . _String
+        let  id = trace (show respBody) $ respBody ^. key "channel" . key "id" . _String
         return $ Right id
 
 slackURL :: String -> String

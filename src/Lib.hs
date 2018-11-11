@@ -54,29 +54,37 @@ findOrCreateChannelID name token = do
 
 createChannelID :: Text -> Token -> IO (Either Text Text)
 createChannelID name apiToken = do
-    let opts = defaults & auth ?~ oauth2Bearer apiToken
     let body = toJSON $ object ["name" .= name]
-    resp <- asValue =<< postWith opts (slackURL "conversations.create") body
-    -- TODO Should handle errors safely
-    let Just id = trace (show $ resp ^? responseBody) $ resp ^? responseBody . key "channel" . key "id" . _String
-    return $ Right id
+    resp <- slackPost apiToken defaults "conversations.create" body
+    case resp of
+      Left err -> return $ Left err
+      Right respBody -> do
+        let Just id = trace (show respBody) $ respBody ^? key "channel" . key "id" . _String
+        return $ Right id
 
 slackURL :: String -> String
 slackURL = ("https://slack.com/api/" ++)
 
 slackGet :: Token -> Options -> String -> IO (Either Text Value)
-slackGet apiToken opts method = do
-    let optsWithAuth = opts & auth ?~ oauth2Bearer apiToken
-    let url = slackURL method
-    resp <- asValue =<< getWith optsWithAuth url
+slackGet apiToken opts method = handleSlackError "GET" method <$> (asValue =<< getWith optsWithAuth url)
+    where optsWithAuth = opts & auth ?~ oauth2Bearer apiToken
+          url = slackURL method
+
+slackPost :: Token -> Options -> String -> Value -> IO (Either Text Value)
+slackPost apiToken opts method body = handleSlackError "POST" method <$> (asValue =<< postWith optsWithAuth url body)
+    where optsWithAuth = opts & auth ?~ oauth2Bearer apiToken
+          url = slackURL method
+
+handleSlackError :: Text -> String -> Response Value -> Either Text Value
+handleSlackError httpMethod method resp =
     let respBody = resp ^. responseBody
-    let ok = respBody ^?! key "ok" . _Bool
-    let error = respBody ^. key "error" . _String
-    let detail = respBody ^? key "detail" . _String
-    if ok then
-        return $ Right respBody
-    else
-        return $ Left ("GET " <> T.pack method <> ": " <> error <> maybe "" (" - " <>) detail)
+        ok = respBody ^?! key "ok" . _Bool
+        error = respBody ^. key "error" . _String
+        detail = respBody ^? key "detail" . _String
+     in if ok then
+            Right respBody
+        else
+            Left (httpMethod <> " " <> T.pack method <> ": " <> error <> maybe "" (" - " <>) detail)
 
 
 findChannelID :: Text -> Token -> IO (Either Text (Maybe Text))

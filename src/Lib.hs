@@ -19,6 +19,7 @@ import Network.Wreq (defaults, param, header, getWith, postWith, asValue, respon
   , oauth2Bearer, Options, Response)
 import Data.Maybe (maybeToList, fromMaybe)
 import Data.Aeson (FromJSON, encode, toJSON, pairs, (.=), object, Value)
+import Data.Aeson.Types (Pair)
 import Control.Lens ((&), (.~), (^?), (^?!), (^..), (^.), (?~))
 import Data.Aeson.Lens (key, values, _String, _Bool)
 import Data.List (find)
@@ -54,8 +55,8 @@ findOrCreateChannelID name token = do
 
 createChannelID :: Text -> Token -> IO (Either Text Text)
 createChannelID name apiToken = do
-    let body = toJSON $ object ["name" .= name]
-    resp <- slackPost apiToken defaults "conversations.create" body
+    let params = ["name" .= name]
+    resp <- slackPost apiToken params "conversations.create"
     case resp of
       Left err -> return $ Left err
       Right respBody -> do
@@ -70,10 +71,11 @@ slackGet apiToken opts method = handleSlackError "GET" method <$> (asValue =<< g
     where optsWithAuth = opts & auth ?~ oauth2Bearer apiToken
           url = slackURL method
 
-slackPost :: Token -> Options -> String -> Value -> IO (Either Text Value)
-slackPost apiToken opts method body = handleSlackError "POST" method <$> (asValue =<< postWith optsWithAuth url body)
-    where optsWithAuth = opts & auth ?~ oauth2Bearer apiToken
+slackPost :: Token -> [Pair] -> String -> IO (Either Text Value)
+slackPost apiToken params method = handleSlackError "POST" method <$> (asValue =<< postWith optsWithAuth url body)
+    where optsWithAuth = defaults & auth ?~ oauth2Bearer apiToken
           url = slackURL method
+          body = toJSON $ object params
 
 handleSlackError :: Text -> String -> Response Value -> Either Text Value
 handleSlackError httpMethod method resp =

@@ -16,10 +16,10 @@ import Data.Foldable (traverse_)
 import Data.Traversable (traverse)
 import Control.Monad ((>=>), mfilter)
 import Network.Wreq (defaults, param, header, getWith, postWith, asValue, responseBody, auth, oauth2Bearer)
-import Data.Maybe (maybeToList)
+import Data.Maybe (maybeToList, fromMaybe)
 import Data.Aeson (FromJSON, encode, toJSON, pairs, (.=), object)
-import Control.Lens ((&), (.~), (^?), (^..), (^.), (?~))
-import Data.Aeson.Lens (key, values, _String)
+import Control.Lens ((&), (.~), (^?), (^?!), (^..), (^.), (?~))
+import Data.Aeson.Lens (key, values, _String, _Bool)
 import Data.List (find)
 import Data.Map as Map (fromList)
 
@@ -47,36 +47,44 @@ someFunc inputPath apiToken = do
     channelID <- findOrCreateChannelID "akahsa-testx" apiToken
     print channelID
 
-findOrCreateChannelID :: Text -> Token -> IO Text
+findOrCreateChannelID :: Text -> Token -> IO (Either Text Text)
 findOrCreateChannelID name token = do
-    currentID <- findChannelID name token
-    maybe (createChannelID name token) return currentID
+    currentIDResult <- findChannelID name token
+    case currentIDResult of
+      Left err -> return $ Left err
+      Right currentID -> maybe (createChannelID name token) (return . Right) currentID
 
-createChannelID :: Text -> Token -> IO Text
+createChannelID :: Text -> Token -> IO (Either Text Text)
 createChannelID name apiToken = do
     let opts = defaults & auth ?~ oauth2Bearer apiToken
     let body = toJSON $ object ["name" .= name]
     resp <- asValue =<< postWith opts (u "conversations.create") body
     -- TODO Should handle errors safely
     let Just id = trace (show $ resp ^? responseBody) $ resp ^? responseBody . key "channel" . key "id" . _String
-    return id
+    return $ Right id
 
-findChannelID :: Text -> Token -> IO (Maybe Text)
+findChannelID :: Text -> Token -> IO (Either Text (Maybe Text))
 findChannelID = findChannelID' Nothing
-findChannelID' :: Maybe Text -> Text -> Token -> IO (Maybe Text)
+findChannelID' :: Maybe Text -> Text -> Token -> IO (Either Text (Maybe Text))
 findChannelID' cursor name apiToken = do
     let opts = defaults & auth ?~ oauth2Bearer apiToken
                         & param "cursor" .~ maybeToList cursor
     resp <- asValue =<< getWith opts (u "conversations.list")
-    let
-        channelID = (^.. values) <$> resp ^? responseBody . key "channels" >>=
-            find (\x -> (x ^? key "name". _String) == Just name) >>=
-                (^? key "id" . _String)
-    let
-        nextCursor = mfilter (not . T.null) $
-            resp ^? responseBody . key "response_metadata" . key "next_cursor" . _String
-    case channelID of
-      Just id -> return $ Just id
-      Nothing -> case nextCursor of
-                   Just c -> findChannelID' (Just c) name apiToken
-                   Nothing -> return Nothing
+    let ok = resp ^?! responseBody . key "ok" . _Bool
+    let errorMessage = resp ^. responseBody . key "error" . _String
+    let errorDetail = resp ^? responseBody . key "detail" . _String
+    if not ok then
+        return $ Left (errorMessage <> fromMaybe ""  errorDetail)
+    else do
+        let
+            channelID = (^.. values) <$> resp ^? responseBody . key "channels" >>=
+                find (\x -> (x ^? key "name". _String) == Just name) >>=
+                    (^? key "id" . _String)
+        let
+            nextCursor = mfilter (not . T.null) $
+                resp ^? responseBody . key "response_metadata" . key "next_cursor" . _String
+        case channelID of
+          Just id -> return $ Right $ Just id
+          Nothing -> case nextCursor of
+                       Just c -> findChannelID' (Just c) name apiToken
+                       Nothing -> return $ Right Nothing

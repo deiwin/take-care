@@ -63,9 +63,7 @@ createChannelID apiToken name userIDs = do
                  , "user_ids" .= intercalate "," (T.unpack <$> userIDs)
                  ]
     resp <- slackPost apiToken params "conversations.create"
-    case resp of
-      Left err -> return $ Left err
-      Right respBody -> return $ Right $ respBody ^. key "channel" . key "id" . _String
+    return $ (^. key "channel" . key "id" . _String) <$> resp
 
 slackURL :: String -> String
 slackURL = ("https://slack.com/api/" ++)

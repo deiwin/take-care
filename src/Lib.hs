@@ -71,12 +71,12 @@ slackGet apiToken opts method = do
     resp <- asValue =<< getWith optsWithAuth url
     let respBody = resp ^. responseBody
     let ok = respBody ^?! key "ok" . _Bool
-    let errorMessage = respBody ^. key "error" . _String
-    let errorDetail = respBody ^? key "detail" . _String
+    let error = respBody ^. key "error" . _String
+    let detail = respBody ^? key "detail" . _String
     if ok then
         return $ Right respBody
     else
-        return $ Left (errorMessage <> fromMaybe ""  errorDetail)
+        return $ Left ("GET " <> T.pack method <> ": " <> error <> maybe "" (" - " <>) detail)
 
 
 findChannelID :: Text -> Token -> IO (Either Text (Maybe Text))

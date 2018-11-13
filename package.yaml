@@ -30,6 +30,8 @@ dependencies:
 - lens-aeson
 - containers
 - bytestring
+- transformers
+- errors
 
 library:
   source-dirs: src

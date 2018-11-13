@@ -20,7 +20,7 @@ import Network.Wreq (defaults, param, header, getWith, postWith, asValue, respon
 import Data.Maybe (maybeToList, fromMaybe)
 import Data.Aeson (FromJSON, encode, toJSON, pairs, (.=), object, Value)
 import Data.Aeson.Types (Pair)
-import Control.Lens ((&), (.~), (^?), (^?!), (^..), (^.), (?~))
+import Control.Lens ((&), (.~), (^?), (^?!), (^..), (^.), (?~), _Just)
 import Data.Aeson.Lens (key, values, _String, _Bool)
 import Data.List (find, intercalate)
 import Data.Map as Map (fromList)
@@ -73,6 +73,23 @@ slackGet apiToken opts method = handleSlackError "GET" method <$> (asValue =<< g
     where optsWithAuth = opts & auth ?~ oauth2Bearer apiToken
           url = slackURL method
 
+slackGetPaginated :: Token -> Options -> String -> IO (Either Text [Value])
+slackGetPaginated = slackGetPaginated' Nothing []
+slackGetPaginated' :: Maybe Text -> [Value] -> Token -> Options -> String -> IO (Either Text [Value])
+slackGetPaginated' cursor acc apiToken opts method = do
+    let optsWithCursor = defaults & param "cursor" .~ maybeToList cursor
+    resp <- slackGet apiToken optsWithCursor "conversations.list"
+    case resp of
+      Left err -> return $ Left err
+      Right respBody -> do
+          let
+            nextCursor = mfilter (not . T.null) $
+                respBody ^? key "response_metadata" . key "next_cursor" . _String
+          let nextAcc = respBody : acc
+          case nextCursor of
+            Just c -> slackGetPaginated' nextCursor nextAcc apiToken opts method
+            Nothing -> return $ Right $ reverse nextAcc
+
 slackPost :: Token -> [Pair] -> String -> IO (Either Text Value)
 slackPost apiToken params method = handleSlackError "POST" method <$> (asValue =<< postWith optsWithAuth url body)
     where optsWithAuth = defaults & auth ?~ oauth2Bearer apiToken
@@ -92,23 +109,13 @@ handleSlackError httpMethod method resp =
 
 
 findChannelID :: Text -> Token -> IO (Either Text (Maybe Text))
-findChannelID = findChannelID' Nothing
-findChannelID' :: Maybe Text -> Text -> Token -> IO (Either Text (Maybe Text))
-findChannelID' cursor name apiToken = do
-    let opts = defaults & param "cursor" .~ maybeToList cursor
-    resp <- slackGet apiToken opts "conversations.list"
+findChannelID name apiToken = do
+    resp <- slackGetPaginated apiToken defaults "conversations.list"
     case resp of
       Left err -> return $ Left err
-      Right respBody -> do
-        let
-            channelID = (^.. values) <$> respBody ^? key "channels" >>=
-                find (\x -> (x ^? key "name". _String) == Just name) >>=
-                    (^? key "id" . _String)
-        let
-            nextCursor = mfilter (not . T.null) $
-                respBody ^? key "response_metadata" . key "next_cursor" . _String
-        case channelID of
-          Just id -> return $ Right $ Just id
-          Nothing -> case nextCursor of
-                       Just c -> findChannelID' (Just c) name apiToken
-                       Nothing -> return $ Right Nothing
+      Right respBodies -> do
+          let
+              channel = find (\x -> (x ^? key "name". _String) == Just name) $
+                  respBodies ^.. traverse . key "channels" . values
+          let channelID = channel ^? _Just . key "id" . _String
+          return $ Right channelID

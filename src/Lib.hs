@@ -83,7 +83,7 @@ slackGetPaginated = slackGetPaginated' Nothing []
 slackGetPaginated' :: Maybe Text -> [Value] -> Token -> Options -> String -> ExceptT Text IO [Value]
 slackGetPaginated' cursor acc apiToken opts method = do
     let optsWithCursor = defaults & param "cursor" .~ maybeToList cursor
-    respBody <- slackGet apiToken optsWithCursor "conversations.list"
+    respBody <- slackGet apiToken optsWithCursor method
     let
       nextCursor = mfilter (not . T.null) $
           respBody ^? key "response_metadata" . key "next_cursor" . _String

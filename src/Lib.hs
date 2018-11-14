@@ -14,7 +14,7 @@ import Text.Show.Functions ()
 import System.FilePath (FilePath)
 import Data.Foldable (traverse_)
 import Data.Traversable (traverse)
-import Control.Monad ((>=>), mfilter)
+import Control.Monad ((>=>), mfilter, unless)
 import Network.Wreq (defaults, param, header, getWith, postWith, asValue, responseBody, auth
   , oauth2Bearer, Options, Response)
 import Data.Maybe (maybeToList, fromMaybe)
@@ -51,9 +51,11 @@ someFunc inputPath apiToken = do
 ensureTeamState :: Token -> InputRecord -> ExceptT Text IO ()
 ensureTeamState apiToken record = do
     let channelName = "tm-" <> team record
+    let teamGroupName = team record
     channelID <- findOrCreateChannelID apiToken channelName (members record)
     lift $ print $ "cid: " <> channelID
     ensureAllMembersPresent apiToken channelID (members record)
+    ensureGroupState apiToken teamGroupName channelID (members record)
 
 findOrCreateChannelID :: Token -> Text -> [Text] -> ExceptT Text IO Text
 findOrCreateChannelID apiToken name userIDs = do
@@ -110,6 +112,46 @@ handleSlackError httpMethod method resp =
             Right respBody
         else
             Left (httpMethod <> " " <> T.pack method <> ": " <> error <> maybe "" (" - " <>) detail)
+
+ensureGroupState :: Token -> Text -> Text -> [Text] -> ExceptT Text IO ()
+ensureGroupState apiToken groupName defaultChannelID userIDs = do
+    let opts = defaults & param "include_disabled" .~ ["true"]
+    respBody <- slackGet apiToken opts "usergroups.list"
+    let
+        group = find (\x -> (x ^? key "handle". _String) == Just groupName) $
+            respBody ^.. key "usergroups" . values
+    case group ^? _Just . key "id" . _String of
+      Nothing -> createGroup apiToken groupName defaultChannelID userIDs
+      Just groupID -> do
+          currentMembers <- getGroupMembers apiToken groupID
+          let sameUsers = L.null (userIDs \\ currentMembers) && L.null (currentMembers \\ userIDs)
+          unless sameUsers $ setGroupMembers apiToken groupID userIDs
+          -- TODO ensure default channel as well
+
+getGroupMembers :: Token -> Text -> ExceptT Text IO [Text]
+getGroupMembers apiToken groupID = do
+    let opts = defaults & param "usergroup" .~ [groupID]
+                        & param "include_disabled" .~ ["true"]
+    respBody <- slackGet apiToken opts "usergroups.users.list"
+    return $ respBody ^.. key "users" . values . _String
+
+setGroupMembers :: Token -> Text -> [Text] -> ExceptT Text IO ()
+setGroupMembers apiToken groupID userIDs = do
+    let params = [ "usergroup" .= groupID
+                 , "users" .= intercalate "," (T.unpack <$> userIDs)
+                 ]
+    slackPost apiToken params "usergroups.users.update"
+    return ()
+
+createGroup :: Token -> Text -> Text -> [Text] -> ExceptT Text IO ()
+createGroup apiToken groupName defaultChannelID userIDs = do
+    let params = [ "handle" .= groupName
+                 , "name" .= ("Team " <> groupName)
+                 , "channels" .= intercalate "," (T.unpack <$> [defaultChannelID])
+                 , "users" .= intercalate "," (T.unpack <$> userIDs)
+                 ]
+    slackPost apiToken params "usergroups.create"
+    return ()
 
 ensureAllMembersPresent :: Token -> Text -> [Text] -> ExceptT Text IO ()
 ensureAllMembersPresent apiToken channelID userIDs = do

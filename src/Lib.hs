@@ -22,7 +22,7 @@ import Data.Aeson (FromJSON, encode, toJSON, pairs, (.=), object, Value)
 import Data.Aeson.Types (Pair)
 import Control.Lens ((&), (.~), (^?), (^?!), (^..), (^.), (?~), _Just)
 import Data.Aeson.Lens (key, values, _String, _Bool)
-import Data.List (find, intercalate)
+import Data.List as L (find, intercalate, null, (\\))
 import Data.Map as Map (fromList)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (ExceptT, runExceptT)
@@ -52,7 +52,8 @@ ensureTeamState :: Token -> InputRecord -> ExceptT Text IO ()
 ensureTeamState apiToken record = do
     let channelName = "tm-" <> team record
     channelID <- findOrCreateChannelID apiToken channelName (members record)
-    lift $ print channelID
+    lift $ print $ "cid: " <> channelID
+    ensureAllMembersPresent apiToken channelID (members record)
 
 findOrCreateChannelID :: Token -> Text -> [Text] -> ExceptT Text IO Text
 findOrCreateChannelID apiToken name userIDs = do
@@ -110,6 +111,27 @@ handleSlackError httpMethod method resp =
         else
             Left (httpMethod <> " " <> T.pack method <> ": " <> error <> maybe "" (" - " <>) detail)
 
+ensureAllMembersPresent :: Token -> Text -> [Text] -> ExceptT Text IO ()
+ensureAllMembersPresent apiToken channelID userIDs = do
+    currentMembers <- getChannelMembers apiToken channelID
+    let missingMembers = userIDs \\ currentMembers
+    if L.null missingMembers
+       then return ()
+       else inviteMembers apiToken channelID missingMembers
+
+getChannelMembers :: Token -> Text -> ExceptT Text IO [Text]
+getChannelMembers apiToken channelID = do
+    let opts = defaults & param "channel" .~ [channelID]
+    respBodies <- slackGetPaginated apiToken opts "conversations.members"
+    return $ respBodies ^.. traverse . key "members" . values . _String
+
+inviteMembers :: Token -> Text -> [Text] -> ExceptT Text IO ()
+inviteMembers apiToken channelID userIDs = do
+    let params = [ "channel" .= channelID
+                 , "users" .= intercalate "," (T.unpack <$> userIDs)
+                 ]
+    slackPost apiToken params "conversations.invite"
+    return ()
 
 findChannelID :: Text -> Token -> ExceptT Text IO (Maybe Text)
 findChannelID name apiToken = do

@@ -45,9 +45,8 @@ someFunc :: FilePath -> Token -> IO ()
 someFunc inputPath apiToken = do
     input <- readInput inputPath
     traverse_ print input
-    -- TODO log error on failures (left) instead of simply ignoring the
-    -- results
-    traverse_ (runExceptT . ensureTeamState apiToken) input
+    results <- traverse (runExceptT . ensureTeamState apiToken) input
+    print results
 
 ensureTeamState :: Token -> InputRecord -> ExceptT Text IO ()
 ensureTeamState apiToken record = do

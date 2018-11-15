@@ -58,7 +58,7 @@ ensureTeamState apiToken record = do
     lift $ print $ "cid: " <> channelID
     ensureAllMembersPresent apiToken channelID userIDs
     caretakerID <- lift $ getCaretaker userIDs
-    setChannelTopic apiToken channelID (topic record) caretakerID
+    ensureChannelTopic apiToken channel (topic record) caretakerID
     ensureGroupState apiToken teamGroupName [channelID] userIDs
     ensureGroupState apiToken caretakerGroupName [channelID] [caretakerID]
   where
@@ -67,11 +67,21 @@ ensureTeamState apiToken record = do
     caretakerGroupName = teamGroupName <> "-caretaker"
     userIDs = members record
 
-setChannelTopic :: Token -> Text -> (Text -> Text) -> Text -> ExceptT Text IO ()
-setChannelTopic apiToken channelID buildTopic caretakerID = do
+ensureChannelTopic :: Token -> Value -> (Text -> Text) -> Text -> ExceptT Text IO ()
+ensureChannelTopic apiToken channel buildTopic caretakerID = do
     caretakerDisplayName <- getDisplayName apiToken caretakerID
+    let newTopic = buildTopic caretakerDisplayName
+    if currentTopic == newTopic
+       then return ()
+       else setChannelTopic apiToken channelID newTopic
+  where
+    channelID = channel ^?! key "id" . _String
+    currentTopic = channel ^?! key "topic" . key "value" . _String
+
+setChannelTopic :: Token -> Text -> Text -> ExceptT Text IO ()
+setChannelTopic apiToken channelID newTopic = do
     let params = [ "channel" .= channelID
-                 , "topic" .= buildTopic caretakerDisplayName
+                 , "topic" .= newTopic
                  ]
     slackPost apiToken params "conversations.setTopic"
     return ()

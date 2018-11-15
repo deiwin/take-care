@@ -23,11 +23,13 @@ import Data.Aeson (FromJSON, encode, toJSON, pairs, (.=), object, Value)
 import Data.Aeson.Types (Pair)
 import Control.Lens ((&), (.~), (^?), (^?!), (^..), (^.), (?~), _Just)
 import Data.Aeson.Lens (key, values, _String, _Bool)
-import Data.List as L (find, intercalate, null, (\\))
+import Data.List as L (find, intercalate, null, (\\), cycle)
 import Data.Map as Map (fromList)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (ExceptT, runExceptT)
 import Control.Error.Util (hoistEither, (??))
+import Data.Time.Clock (getCurrentTime, UTCTime(..))
+import Data.Time.Calendar.WeekDate (toWeekDate)
 
 import Debug.Trace (trace)
 
@@ -55,10 +57,18 @@ ensureTeamState apiToken record = do
     lift $ print $ "cid: " <> channelID
     ensureAllMembersPresent apiToken channelID userIDs
     ensureGroupState apiToken teamGroupName channelID userIDs
+    caretakerID <- lift $ getCaretaker userIDs
+    ensureGroupState apiToken caretakerGroupName channelID [caretakerID]
   where
     channelName = "tm-" <> team record
     teamGroupName = team record
+    caretakerGroupName = teamGroupName <> "-caretaker"
     userIDs = members record
+
+getCaretaker :: [Text] -> IO Text
+getCaretaker userIDs = do
+    (_, currentUtcWeek, _) <- (toWeekDate . utctDay) <$> getCurrentTime
+    return $ cycle userIDs !! currentUtcWeek
 
 findOrCreateChannelID :: Token -> Text -> [Text] -> ExceptT Text IO Text
 findOrCreateChannelID apiToken name userIDs = do

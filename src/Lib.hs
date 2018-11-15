@@ -71,9 +71,7 @@ ensureChannelTopic :: Token -> Value -> (Text -> Text) -> Text -> ExceptT Text I
 ensureChannelTopic apiToken channel buildTopic caretakerID = do
     caretakerDisplayName <- getDisplayName apiToken caretakerID
     let newTopic = buildTopic caretakerDisplayName
-    if currentTopic == newTopic
-       then return ()
-       else setChannelTopic apiToken channelID newTopic
+    unless (currentTopic == newTopic) $ setChannelTopic apiToken channelID newTopic
   where
     channelID = channel ^?! key "id" . _String
     currentTopic = channel ^?! key "topic" . key "value" . _String
@@ -211,9 +209,7 @@ ensureAllMembersPresent :: Token -> Text -> [Text] -> ExceptT Text IO ()
 ensureAllMembersPresent apiToken channelID userIDs = do
     currentMembers <- getChannelMembers apiToken channelID
     let missingMembers = userIDs \\ currentMembers
-    if L.null missingMembers
-       then return ()
-       else inviteMembers apiToken channelID missingMembers
+    unless (L.null missingMembers) $ inviteMembers apiToken channelID missingMembers
 
 getChannelMembers :: Token -> Text -> ExceptT Text IO [Text]
 getChannelMembers apiToken channelID = do

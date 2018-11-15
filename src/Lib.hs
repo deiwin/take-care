@@ -56,14 +56,31 @@ ensureTeamState apiToken record = do
     channelID <- findOrCreateChannelID apiToken channelName userIDs
     lift $ print $ "cid: " <> channelID
     ensureAllMembersPresent apiToken channelID userIDs
-    ensureGroupState apiToken teamGroupName [channelID] userIDs
     caretakerID <- lift $ getCaretaker userIDs
+    setChannelTopic apiToken channelID (topic record) caretakerID
+    ensureGroupState apiToken teamGroupName [channelID] userIDs
     ensureGroupState apiToken caretakerGroupName [channelID] [caretakerID]
   where
     channelName = "tm-" <> team record
     teamGroupName = team record
     caretakerGroupName = teamGroupName <> "-caretaker"
     userIDs = members record
+
+setChannelTopic :: Token -> Text -> (Text -> Text) -> Text -> ExceptT Text IO ()
+setChannelTopic apiToken channelID buildTopic caretakerID = do
+    caretakerDisplayName <- getDisplayName apiToken caretakerID
+    let params = [ "channel" .= channelID
+                 , "topic" .= buildTopic caretakerDisplayName
+                 ]
+    slackPost apiToken params "conversations.setTopic"
+    return ()
+
+getDisplayName :: Token -> Text -> ExceptT Text IO Text
+getDisplayName apiToken id = do
+    let opts = defaults & param "user" .~ [id]
+    respBody <- slackGet apiToken opts "users.info"
+    let displayName = ("@" <>) <$> respBody ^? key "user" . key "profile" . key "display_name" . _String
+    displayName ?? "\"users.info\" response didn't include \"user.profile.display_name\" field"
 
 getCaretaker :: [Text] -> IO Text
 getCaretaker userIDs = do

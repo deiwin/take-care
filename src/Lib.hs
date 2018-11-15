@@ -59,12 +59,14 @@ ensureTeamState apiToken record = do
     ensureAllMembersPresent apiToken channelID userIDs
     caretakerID <- lift $ getCaretaker userIDs
     ensureChannelTopic apiToken channel (topic record) caretakerID
-    ensureGroupState apiToken teamGroupName [channelID] userIDs
-    ensureGroupState apiToken caretakerGroupName [channelID] [caretakerID]
+    ensureGroupState apiToken teamGroupHandle teamGroupName [channelID] userIDs
+    ensureGroupState apiToken caretakerGroupHandle caretakerGroupName [channelID] [caretakerID]
   where
     channelName = "tm-" <> team record
-    teamGroupName = team record
-    caretakerGroupName = teamGroupName <> "-caretaker"
+    teamGroupHandle = team record
+    teamGroupName = "Team " <> teamGroupHandle
+    caretakerGroupHandle = teamGroupHandle <> "-caretaker"
+    caretakerGroupName = teamGroupName <> " caretaker"
     userIDs = members record
 
 ensureChannelTopic :: Token -> Value -> (Text -> Text) -> Text -> ExceptT Text IO ()
@@ -152,12 +154,12 @@ handleSlackError httpMethod method resp =
         else
             Left (httpMethod <> " " <> T.pack method <> ": " <> error <> maybe "" (" - " <>) detail)
 
-ensureGroupState :: Token -> Text -> [Text] -> [Text] -> ExceptT Text IO ()
-ensureGroupState apiToken groupName defaultChannelIDs userIDs = do
+ensureGroupState :: Token -> Text -> Text -> [Text] -> [Text] -> ExceptT Text IO ()
+ensureGroupState apiToken groupHandle groupName defaultChannelIDs userIDs = do
     let opts = defaults & param "include_disabled" .~ ["true"]
     respBody <- slackGet apiToken opts "usergroups.list"
     let
-        existingGroup = find (\x -> (x ^? key "handle". _String) == Just groupName) $
+        existingGroup = find (\x -> (x ^? key "handle". _String) == Just groupHandle) $
             respBody ^.. key "usergroups" . values
     group <- maybe createNew return existingGroup
     let groupID = getID group
@@ -168,7 +170,7 @@ ensureGroupState apiToken groupName defaultChannelIDs userIDs = do
     let currentChannels = group ^.. key "prefs" . key "channels" . values . _String
     unless (same defaultChannelIDs currentChannels) $ setGroupChannels apiToken groupID defaultChannelIDs
   where
-    createNew = createGroup apiToken groupName defaultChannelIDs
+    createNew = createGroup apiToken groupHandle groupName defaultChannelIDs
     getID group = group ^. key "id" . _String
     same a b = L.null (a \\ b) && L.null (b \\ a)
 
@@ -195,10 +197,10 @@ setGroupChannels apiToken groupID defaultChannelIDs = do
     slackPost apiToken params "usergroups.update"
     return ()
 
-createGroup :: Token -> Text -> [Text] -> ExceptT Text IO Value
-createGroup apiToken groupName defaultChannelIDs = do
-    let params = [ "handle" .= groupName
-                 , "name" .= ("Team " <> groupName)
+createGroup :: Token -> Text -> Text -> [Text] -> ExceptT Text IO Value
+createGroup apiToken groupHandle groupName defaultChannelIDs = do
+    let params = [ "handle" .= groupHandle
+                 , "name" .= groupName
                  , "channels" .= intercalate "," (T.unpack <$> defaultChannelIDs)
                  ]
     respBody <- slackPost apiToken params "usergroups.create"

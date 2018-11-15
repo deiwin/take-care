@@ -53,7 +53,8 @@ someFunc inputPath apiToken = do
 
 ensureTeamState :: Token -> InputRecord -> ExceptT Text IO ()
 ensureTeamState apiToken record = do
-    channelID <- findOrCreateChannelID apiToken channelName userIDs
+    channel <- findOrCreateChannel apiToken channelName userIDs
+    let channelID = channel ^?! key "id" . _String
     lift $ print $ "cid: " <> channelID
     ensureAllMembersPresent apiToken channelID userIDs
     caretakerID <- lift $ getCaretaker userIDs
@@ -87,18 +88,18 @@ getCaretaker userIDs = do
     (_, currentUtcWeek, _) <- (toWeekDate . utctDay) <$> getCurrentTime
     return $ cycle userIDs !! currentUtcWeek
 
-findOrCreateChannelID :: Token -> Text -> [Text] -> ExceptT Text IO Text
-findOrCreateChannelID apiToken name userIDs = do
-    currentID <- findChannelID name apiToken
-    maybe (createChannelID apiToken name userIDs) return currentID
+findOrCreateChannel :: Token -> Text -> [Text] -> ExceptT Text IO Value
+findOrCreateChannel apiToken name userIDs = do
+    current <- findChannel name apiToken
+    maybe (createChannel apiToken name userIDs) return current
 
-createChannelID :: Token -> Text -> [Text] -> ExceptT Text IO Text
-createChannelID apiToken name userIDs = do
+createChannel :: Token -> Text -> [Text] -> ExceptT Text IO Value
+createChannel apiToken name userIDs = do
     let params = [ "name" .= name
                  , "user_ids" .= intercalate "," (T.unpack <$> userIDs)
                  ]
     respBody <- slackPost apiToken params "conversations.create"
-    return $ respBody ^. key "channel" . key "id" . _String
+    (respBody ^? key "channel") ?? "\"conversations.create\" response didn't include a \"channel\" key"
 
 slackURL :: String -> String
 slackURL = ("https://slack.com/api/" ++)
@@ -218,11 +219,8 @@ inviteMembers apiToken channelID userIDs = do
     slackPost apiToken params "conversations.invite"
     return ()
 
-findChannelID :: Text -> Token -> ExceptT Text IO (Maybe Text)
-findChannelID name apiToken = do
+findChannel :: Text -> Token -> ExceptT Text IO (Maybe Value)
+findChannel name apiToken = do
     respBodies <- slackGetPaginated apiToken defaults "conversations.list"
-    let
-        channel = find (\x -> (x ^? key "name". _String) == Just name) $
-            respBodies ^.. traverse . key "channels" . values
-    let channelID = channel ^? _Just . key "id" . _String
-    return channelID
+    return $ find (\x -> (x ^? key "name". _String) == Just name) $
+        respBodies ^.. traverse . key "channels" . values

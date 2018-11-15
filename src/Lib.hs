@@ -123,13 +123,17 @@ ensureGroupState apiToken groupName defaultChannelID userIDs = do
             respBody ^.. key "usergroups" . values
     group <- maybe createNew return existingGroup
     let groupID = getID group
+
     currentMembers <- getGroupMembers apiToken groupID
-    let sameUsers = L.null (userIDs \\ currentMembers) && L.null (currentMembers \\ userIDs)
-    unless sameUsers $ setGroupMembers apiToken groupID userIDs
-    -- TODO ensure default channel as well
+    unless (same userIDs currentMembers) $ setGroupMembers apiToken groupID userIDs
+
+    let currentChannels = group ^.. key "prefs" . key "channels" . values . _String
+    unless (same defaultChannelIDs currentChannels) $ setGroupChannels apiToken groupID defaultChannelIDs
   where
-    createNew = createGroup apiToken groupName defaultChannelID
+    defaultChannelIDs = [defaultChannelID]
+    createNew = createGroup apiToken groupName defaultChannelIDs
     getID group = group ^. key "id" . _String
+    same a b = L.null (a \\ b) && L.null (b \\ a)
 
 getGroupMembers :: Token -> Text -> ExceptT Text IO [Text]
 getGroupMembers apiToken groupID = do
@@ -146,11 +150,19 @@ setGroupMembers apiToken groupID userIDs = do
     slackPost apiToken params "usergroups.users.update"
     return ()
 
-createGroup :: Token -> Text -> Text -> ExceptT Text IO Value
-createGroup apiToken groupName defaultChannelID = do
+setGroupChannels :: Token -> Text -> [Text] -> ExceptT Text IO ()
+setGroupChannels apiToken groupID defaultChannelIDs = do
+    let params = [ "usergroup" .= groupID
+                 , "channels" .= intercalate "," (T.unpack <$> defaultChannelIDs)
+                 ]
+    slackPost apiToken params "usergroups.update"
+    return ()
+
+createGroup :: Token -> Text -> [Text] -> ExceptT Text IO Value
+createGroup apiToken groupName defaultChannelIDs = do
     let params = [ "handle" .= groupName
                  , "name" .= ("Team " <> groupName)
-                 , "channels" .= intercalate "," (T.unpack <$> [defaultChannelID])
+                 , "channels" .= intercalate "," (T.unpack <$> defaultChannelIDs)
                  ]
     respBody <- slackPost apiToken params "usergroups.create"
     let group = respBody ^? key "usergroup"

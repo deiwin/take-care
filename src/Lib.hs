@@ -56,9 +56,9 @@ ensureTeamState apiToken record = do
     channelID <- findOrCreateChannelID apiToken channelName userIDs
     lift $ print $ "cid: " <> channelID
     ensureAllMembersPresent apiToken channelID userIDs
-    ensureGroupState apiToken teamGroupName channelID userIDs
+    ensureGroupState apiToken teamGroupName [channelID] userIDs
     caretakerID <- lift $ getCaretaker userIDs
-    ensureGroupState apiToken caretakerGroupName channelID [caretakerID]
+    ensureGroupState apiToken caretakerGroupName [channelID] [caretakerID]
   where
     channelName = "tm-" <> team record
     teamGroupName = team record
@@ -126,8 +126,8 @@ handleSlackError httpMethod method resp =
         else
             Left (httpMethod <> " " <> T.pack method <> ": " <> error <> maybe "" (" - " <>) detail)
 
-ensureGroupState :: Token -> Text -> Text -> [Text] -> ExceptT Text IO ()
-ensureGroupState apiToken groupName defaultChannelID userIDs = do
+ensureGroupState :: Token -> Text -> [Text] -> [Text] -> ExceptT Text IO ()
+ensureGroupState apiToken groupName defaultChannelIDs userIDs = do
     let opts = defaults & param "include_disabled" .~ ["true"]
     respBody <- slackGet apiToken opts "usergroups.list"
     let
@@ -142,7 +142,6 @@ ensureGroupState apiToken groupName defaultChannelID userIDs = do
     let currentChannels = group ^.. key "prefs" . key "channels" . values . _String
     unless (same defaultChannelIDs currentChannels) $ setGroupChannels apiToken groupID defaultChannelIDs
   where
-    defaultChannelIDs = [defaultChannelID]
     createNew = createGroup apiToken groupName defaultChannelIDs
     getID group = group ^. key "id" . _String
     same a b = L.null (a \\ b) && L.null (b \\ a)

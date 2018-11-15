@@ -4,7 +4,7 @@
 {-# LANGUAGE BangPatterns        #-}
 
 module Lib
-    ( someFunc
+    ( ensure
     ) where
 
 import Dhall (input, auto, Interpret)
@@ -44,8 +44,8 @@ instance Interpret InputRecord
 readInput :: FilePath -> IO [InputRecord]
 readInput = input auto . T.pack
 
-someFunc :: FilePath -> Token -> IO ()
-someFunc inputPath apiToken = do
+ensure :: FilePath -> Token -> IO ()
+ensure inputPath apiToken = do
     input <- readInput inputPath
     traverse_ print input
     ensureStateOfAllTeams apiToken input

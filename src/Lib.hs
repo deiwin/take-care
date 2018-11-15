@@ -48,8 +48,19 @@ someFunc :: FilePath -> Token -> IO ()
 someFunc inputPath apiToken = do
     input <- readInput inputPath
     traverse_ print input
-    results <- traverse (runExceptT . ensureTeamState apiToken) input
-    print results
+    ensureStateOfAllTeams apiToken input
+    return ()
+
+ensureStateOfAllTeams :: Token -> [InputRecord] -> IO ()
+ensureStateOfAllTeams apiToken records = do
+    caretakerIDs <- traverse getCaretaker (members <$> records)
+    results <- traverse (runExceptT . ensureTeamState apiToken) records
+    result <- runExceptT $ ensureGroupState apiToken groupHandle groupName groupChannels caretakerIDs
+    print (results ++ [result])
+  where
+    groupHandle = "caretakers"
+    groupName = "Current caretakers of every team"
+    groupChannels = []
 
 ensureTeamState :: Token -> InputRecord -> ExceptT Text IO ()
 ensureTeamState apiToken record = do

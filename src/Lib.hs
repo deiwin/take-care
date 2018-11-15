@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE BangPatterns        #-}
 
 module Lib
     ( someFunc
@@ -83,7 +84,7 @@ slackGet apiToken opts method = do
 slackGetPaginated :: Token -> Options -> String -> ExceptT Text IO [Value]
 slackGetPaginated = slackGetPaginated' Nothing []
 slackGetPaginated' :: Maybe Text -> [Value] -> Token -> Options -> String -> ExceptT Text IO [Value]
-slackGetPaginated' cursor acc apiToken opts method = do
+slackGetPaginated' cursor !acc apiToken opts method = do
     let optsWithCursor = opts & param "cursor" .~ maybeToList cursor
     respBody <- slackGet apiToken optsWithCursor method
     let

@@ -51,12 +51,14 @@ someFunc inputPath apiToken = do
 
 ensureTeamState :: Token -> InputRecord -> ExceptT Text IO ()
 ensureTeamState apiToken record = do
-    let channelName = "tm-" <> team record
-    let teamGroupName = team record
-    channelID <- findOrCreateChannelID apiToken channelName (members record)
+    channelID <- findOrCreateChannelID apiToken channelName userIDs
     lift $ print $ "cid: " <> channelID
-    ensureAllMembersPresent apiToken channelID (members record)
-    ensureGroupState apiToken teamGroupName channelID (members record)
+    ensureAllMembersPresent apiToken channelID userIDs
+    ensureGroupState apiToken teamGroupName channelID userIDs
+  where
+    channelName = "tm-" <> team record
+    teamGroupName = team record
+    userIDs = members record
 
 findOrCreateChannelID :: Token -> Text -> [Text] -> ExceptT Text IO Text
 findOrCreateChannelID apiToken name userIDs = do

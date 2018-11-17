@@ -9,15 +9,16 @@ module Slack.User
     , getAllDisplayNames
     ) where
 
+import Prelude hiding (id)
 import Slack.Util (slackGet, slackGetPaginated, fromJSON, Token)
 import Data.Text (Text)
-import Data.Traversable (traverse)
+import Data.Traversable (traverse, sequenceA)
 import Network.Wreq (defaults, param)
 import Control.Lens ((&), (.~), (^?), (^.), (^..))
 import Control.Lens.TH (makeLenses)
 import GHC.Generics (Generic)
 import Data.Aeson (FromJSON(parseJSON), withObject, (.:))
-import Data.Aeson.Lens (key, values, _String)
+import Data.Aeson.Lens (key, values)
 import Data.List (zip)
 import Control.Monad.Trans.Except (ExceptT)
 import Control.Error.Util ((??))
@@ -47,7 +48,9 @@ getDisplayName apiToken userID = do
 getAllDisplayNames :: Token -> ExceptT Text IO [(Text, Text)]
 getAllDisplayNames apiToken = do
     respBodies <- slackGetPaginated apiToken defaults "users.list"
-    let members = respBodies ^.. traverse . key "members" . values
-    let ids = members ^.. traverse . key "id" . _String
-    let displayNames = ("@" <>) <$> members ^.. traverse . key "profile" . key "display_name" . _String
-    return $ zip ids displayNames
+    vals <- concatMap (^.. values) <$>
+        (traverse (^? key "members") respBodies ??
+            "\"users.list\" response didn't include a \"members\" field")
+    users <- traverse fromJSON vals
+    return $ zip ((^. id) <$> users)
+                 ((^. displayName) <$> users)

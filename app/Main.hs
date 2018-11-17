@@ -26,7 +26,7 @@ parse args
   where flags = filter ("-" `isPrefixOf`) args
 parse ("ensure":rest) = runEnsure =<< readInput rest
 parse ("list-caretakers":rest) = runListCaretakers =<< readInput rest
-parse ("list-users":rest) = runListUsers =<< readInput rest
+parse ["list-users"] = runListUsers
 parse _ = usage >> exitFailure
 
 usage :: IO ()
@@ -38,8 +38,8 @@ runEnsure :: Text -> IO ()
 runEnsure inputText = getApiToken >>= ensure inputText
 runListCaretakers :: Text -> IO ()
 runListCaretakers inputText = getApiToken >>= listCaretakers inputText
-runListUsers :: Text -> IO ()
-runListUsers inputText = getApiToken >>= listUsers inputText
+runListUsers :: IO ()
+runListUsers = getApiToken >>= listUsers
 
 getApiToken :: IO ByteString
 getApiToken = BS.pack . fromMaybe (error "API_TOKEN env variable not set") <$>

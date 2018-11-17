@@ -6,6 +6,7 @@ module Slack.Util
     ( slackGet
     , slackGetPaginated
     , slackPost
+    , fromJSON
     , Token
     ) where
 
@@ -16,8 +17,9 @@ import Control.Monad (mfilter)
 import Network.Wreq (defaults, param, getWith, postWith, asValue, responseBody, auth
   , oauth2Bearer, Options, Response)
 import Data.Maybe (maybeToList)
-import Data.Aeson (toJSON, object, Value)
-import Data.Aeson.Types (Pair)
+import Data.Aeson (toJSON, FromJSON, object, Value)
+import qualified Data.Aeson as A (fromJSON)
+import Data.Aeson.Types (Pair, Result(Error, Success))
 import Control.Lens ((&), (.~), (^?), (^?!), (^.), (?~))
 import Data.Aeson.Lens (key, _String, _Bool)
 import Control.Monad.Trans.Class (lift)
@@ -68,3 +70,9 @@ handleSlackError httpMethod method resp =
             Right respBody
         else
             Left (httpMethod <> " " <> T.pack method <> ": " <> error <> maybe "" (" - " <>) detail)
+
+fromJSON :: (FromJSON a, Monad m) => Value -> ExceptT Text m a
+fromJSON = hoistEither . hoistResult  . A.fromJSON
+    where hoistResult res = case res of
+                              Error e -> Left $ pack e
+                              Success o -> Right o

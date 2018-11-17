@@ -24,10 +24,7 @@ parse args
   || elem "--help" flags = usage >> exitSuccess
   | not (null flags) = usage >> exitFailure
   where flags = filter ("-" `isPrefixOf`) args
-parse ("ensure":rest) = runEnsure =<<
-    case rest of
-      [] -> getContents
-      fs -> mconcat <$> traverse readFile fs
+parse ("ensure":rest) = runEnsure =<< readInput rest
 parse _ = usage >> exitFailure
 
 usage :: IO ()
@@ -39,3 +36,7 @@ runEnsure inputText = getApiToken >>= ensure inputText
 getApiToken :: IO ByteString
 getApiToken = BS.pack . fromMaybe (error "API_TOKEN env variable not set") <$>
         lookupEnv "API_TOKEN"
+
+readInput :: [String] -> IO Text
+readInput [] = getContents
+readInput fs = mconcat <$> traverse readFile fs

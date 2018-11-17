@@ -12,7 +12,6 @@ import Data.Text as T (Text, pack, unpack, null)
 import Data.ByteString (ByteString)
 import GHC.Generics (Generic)
 import Text.Show.Functions ()
-import System.FilePath (FilePath)
 import Data.Foldable (traverse_)
 import Data.Traversable (traverse)
 import Control.Monad ((>=>), mfilter, unless)
@@ -41,14 +40,11 @@ data InputRecord = InputRecord { members :: [Text]
 
 instance Interpret InputRecord
 
-readInput :: FilePath -> IO [InputRecord]
-readInput = input auto . T.pack
-
-ensure :: FilePath -> Token -> IO ()
-ensure inputPath apiToken = do
-    input <- readInput inputPath
-    traverse_ print input
-    ensureStateOfAllTeams apiToken input
+ensure :: Text -> Token -> IO ()
+ensure inputText apiToken = do
+    records <- input auto inputText
+    traverse_ print records
+    ensureStateOfAllTeams apiToken records
     return ()
 
 ensureStateOfAllTeams :: Token -> [InputRecord] -> IO ()

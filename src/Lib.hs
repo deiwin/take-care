@@ -5,10 +5,12 @@
 
 module Lib
     ( ensure
+    , listCaretakers
     ) where
 
 import Dhall (input, auto, Interpret)
 import Data.Text as T (Text, pack, unpack, null)
+import Text.Printf (printf)
 import Data.ByteString (ByteString)
 import GHC.Generics (Generic)
 import Text.Show.Functions ()
@@ -22,7 +24,7 @@ import Data.Aeson (FromJSON, encode, toJSON, pairs, (.=), object, Value)
 import Data.Aeson.Types (Pair)
 import Control.Lens ((&), (.~), (^?), (^?!), (^..), (^.), (?~), _Just)
 import Data.Aeson.Lens (key, values, _String, _Bool)
-import Data.List as L (find, intercalate, null, (\\), cycle)
+import Data.List as L (find, intercalate, null, (\\), cycle, zip3)
 import Data.Map as Map (fromList)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (ExceptT, runExceptT)
@@ -46,6 +48,19 @@ ensure inputText apiToken = do
     traverse_ print records
     ensureStateOfAllTeams apiToken records
     return ()
+
+listCaretakers :: Text -> Token -> IO ()
+listCaretakers inputText apiToken = do
+    runExceptT $ listCaretakers' inputText apiToken
+    return ()
+listCaretakers' :: Text -> Token -> ExceptT Text IO ()
+listCaretakers' inputText apiToken = do
+    records <- lift $ input auto inputText
+    caretakerIDs <- traverse (lift . getCaretaker) (members <$> records)
+    caretakerDisplayNames <- traverse (getDisplayName apiToken) caretakerIDs
+    traverse_ (lift . printLine) $ zip3 (team <$> records) caretakerDisplayNames caretakerIDs
+  where
+    printLine (team, name, id) = printf "Team %s: %s (%s)\n" team name id
 
 ensureStateOfAllTeams :: Token -> [InputRecord] -> IO ()
 ensureStateOfAllTeams apiToken records = do

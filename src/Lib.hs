@@ -2,17 +2,17 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
-
 module Lib
     ( ensure
     , listCaretakers
     , listUsers
     ) where
 
+import Prelude hiding (id)
 import Slack.Util (slackGet, Token)
 import Slack.Channel (findChannel, createChannel, inviteMembers, getChannelMembers, setChannelTopic)
 import Slack.Group (getGroupMembers, setGroupMembers, setGroupChannels, createGroup)
-import Slack.User (getDisplayName, getAllDisplayNames)
+import Slack.User (getUser, listAllUsers, id, displayName)
 import Dhall (input, auto, Interpret)
 import Data.Text (Text)
 import Text.Printf (printf)
@@ -49,16 +49,16 @@ listCaretakers :: Text -> Token -> IO ()
 listCaretakers inputText apiToken = (void . runExceptT) $ do
     records <- lift $ input auto inputText
     caretakerIDs <- traverse (lift . getCaretaker) (members <$> records)
-    caretakerDisplayNames <- traverse (getDisplayName apiToken) caretakerIDs
+    caretakerDisplayNames <- traverse (fmap (^. displayName) . getUser apiToken) caretakerIDs
     traverse_ (lift . printLine) $ zip3 (team <$> records) caretakerDisplayNames caretakerIDs
   where
     printLine (teamName, userName, userID) = printf "Team %s: %s (%s)\n" teamName userName userID
 
 listUsers :: Token -> IO ()
 listUsers apiToken = (void . runExceptT) $
-    traverse_ (lift . printLine) =<< getAllDisplayNames apiToken
+    traverse_ (lift . printLine) =<< listAllUsers apiToken
   where
-    printLine (userID, userName) = printf "%s: %s\n" userID userName
+    printLine user = printf "%s: %s\n" (user ^. id) (user ^. displayName)
 
 ensureStateOfAllTeams :: Token -> [InputRecord] -> IO ()
 ensureStateOfAllTeams apiToken records = do
@@ -91,7 +91,7 @@ ensureTeamState apiToken record = do
 
 ensureChannelTopic :: Token -> Value -> (Text -> Text) -> Text -> ExceptT Text IO ()
 ensureChannelTopic apiToken channel buildTopic caretakerID = do
-    caretakerDisplayName <- getDisplayName apiToken caretakerID
+    caretakerDisplayName <- (^. displayName) <$> getUser apiToken caretakerID
     let newTopic = buildTopic caretakerDisplayName
     unless (currentTopic == newTopic) $ setChannelTopic apiToken channelID newTopic
   where

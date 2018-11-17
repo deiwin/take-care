@@ -8,10 +8,11 @@ module Lib
     , listUsers
     ) where
 
-import Slack.Util (slackGet, Token)
-import Slack.Channel as Channel (findChannel, createChannel, inviteMembers, getChannelMembers, setChannelTopic
-  , Channel, id, topic)
-import Slack.Group (getGroupMembers, setGroupMembers, setGroupChannels, createGroup)
+import Slack.Util (Token)
+import Slack.Channel as Channel (findChannel, createChannel, inviteMembers, getChannelMembers
+  , setChannelTopic, Channel, id, topic)
+import Slack.Group as Group (getGroupMembers, setGroupMembers, setGroupChannels, findGroup
+  , createGroup, id, channelIDs)
 import Slack.User as User (getUser, listAllUsers, id, displayName)
 import Dhall (input, auto, Interpret)
 import Data.Text (Text)
@@ -21,10 +22,8 @@ import Text.Show.Functions ()
 import Data.Foldable (traverse_)
 import Data.Traversable (traverse)
 import Control.Monad (unless, void)
-import Network.Wreq (defaults, param)
-import Control.Lens ((&), (.~), (^?), (^..), (^.))
-import Data.Aeson.Lens (key, values, _String)
-import Data.List (find, null, (\\), cycle, zip3)
+import Control.Lens ((^.))
+import Data.List (null, (\\), cycle, zip3)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (ExceptT, runExceptT)
 import Data.Time.Clock (getCurrentTime, UTCTime(..))
@@ -109,22 +108,17 @@ findOrCreateChannel apiToken name userIDs = do
 
 ensureGroupState :: Token -> Text -> Text -> [Text] -> [Text] -> ExceptT Text IO ()
 ensureGroupState apiToken groupHandle groupName defaultChannelIDs userIDs = do
-    let opts = defaults & param "include_disabled" .~ ["true"]
-    respBody <- slackGet apiToken opts "usergroups.list"
-    let
-        existingGroup = find (\x -> (x ^? key "handle". _String) == Just groupHandle) $
-            respBody ^.. key "usergroups" . values
+    existingGroup <- findGroup apiToken groupHandle
     group <- maybe createNew return existingGroup
-    let groupID = getID group
+    let groupID = group ^. Group.id
 
     currentMembers <- getGroupMembers apiToken groupID
     unless (same userIDs currentMembers) $ setGroupMembers apiToken groupID userIDs
 
-    let currentChannels = group ^.. key "prefs" . key "channels" . values . _String
+    let currentChannels = group ^. channelIDs
     unless (same defaultChannelIDs currentChannels) $ setGroupChannels apiToken groupID defaultChannelIDs
   where
     createNew = createGroup apiToken groupHandle groupName defaultChannelIDs
-    getID group = group ^. key "id" . _String
     same a b = null (a \\ b) && null (b \\ a)
 
 ensureAllMembersPresent :: Token -> Text -> [Text] -> ExceptT Text IO ()

@@ -6,6 +6,7 @@
 module Lib
     ( ensure
     , listCaretakers
+    , listUsers
     ) where
 
 import Dhall (input, auto, Interpret)
@@ -16,7 +17,7 @@ import GHC.Generics (Generic)
 import Text.Show.Functions ()
 import Data.Foldable (traverse_)
 import Data.Traversable (traverse)
-import Control.Monad ((>=>), mfilter, unless)
+import Control.Monad ((>=>), mfilter, unless, void)
 import Network.Wreq (defaults, param, header, getWith, postWith, asValue, responseBody, auth
   , oauth2Bearer, Options, Response)
 import Data.Maybe (maybeToList, fromMaybe)
@@ -24,7 +25,7 @@ import Data.Aeson (FromJSON, encode, toJSON, pairs, (.=), object, Value)
 import Data.Aeson.Types (Pair)
 import Control.Lens ((&), (.~), (^?), (^?!), (^..), (^.), (?~), _Just)
 import Data.Aeson.Lens (key, values, _String, _Bool)
-import Data.List as L (find, intercalate, null, (\\), cycle, zip3)
+import Data.List as L (find, intercalate, null, (\\), cycle, zip, zip3)
 import Data.Map as Map (fromList)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (ExceptT, runExceptT)
@@ -50,17 +51,19 @@ ensure inputText apiToken = do
     return ()
 
 listCaretakers :: Text -> Token -> IO ()
-listCaretakers inputText apiToken = do
-    runExceptT $ listCaretakers' inputText apiToken
-    return ()
-listCaretakers' :: Text -> Token -> ExceptT Text IO ()
-listCaretakers' inputText apiToken = do
+listCaretakers inputText apiToken = (void . runExceptT) $ do
     records <- lift $ input auto inputText
     caretakerIDs <- traverse (lift . getCaretaker) (members <$> records)
     caretakerDisplayNames <- traverse (getDisplayName apiToken) caretakerIDs
     traverse_ (lift . printLine) $ zip3 (team <$> records) caretakerDisplayNames caretakerIDs
   where
     printLine (team, name, id) = printf "Team %s: %s (%s)\n" team name id
+
+listUsers :: Text -> Token -> IO ()
+listUsers inputText apiToken = (void . runExceptT) $
+    traverse_ (lift . printLine) =<< getAllDisplayNames apiToken
+  where
+    printLine (id, name) = printf "%s: %s\n" id name
 
 ensureStateOfAllTeams :: Token -> [InputRecord] -> IO ()
 ensureStateOfAllTeams apiToken records = do
@@ -114,6 +117,14 @@ getDisplayName apiToken id = do
     respBody <- slackGet apiToken opts "users.info"
     let displayName = ("@" <>) <$> respBody ^? key "user" . key "profile" . key "display_name" . _String
     displayName ?? "\"users.info\" response didn't include \"user.profile.display_name\" field"
+
+getAllDisplayNames :: Token -> ExceptT Text IO [(Text, Text)]
+getAllDisplayNames apiToken = do
+    respBodies <- slackGetPaginated apiToken defaults "users.list"
+    let members = respBodies ^.. traverse . key "members" . values
+    let ids = members ^.. traverse . key "id" . _String
+    let displayNames = ("@" <>) <$> members ^.. traverse . key "profile" . key "display_name" . _String
+    return $ zip ids displayNames
 
 getCaretaker :: [Text] -> IO Text
 getCaretaker userIDs = do

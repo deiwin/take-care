@@ -2,7 +2,7 @@
 
 module Main where
 
-import Lib (ensure, listCaretakers)
+import Lib (ensure, listCaretakers, listUsers)
 import System.Environment (lookupEnv, getArgs)
 import System.Exit (exitSuccess, exitFailure)
 import Data.ByteString (ByteString)
@@ -26,16 +26,20 @@ parse args
   where flags = filter ("-" `isPrefixOf`) args
 parse ("ensure":rest) = runEnsure =<< readInput rest
 parse ("list-caretakers":rest) = runListCaretakers =<< readInput rest
+parse ("list-users":rest) = runListUsers =<< readInput rest
 parse _ = usage >> exitFailure
 
 usage :: IO ()
-usage = putStrLn "Usage: take-care [ensure|list-caretakers] [-h|--help] [file ..]"
+usage = putStrLn "Usage: take-care [-h|--help] ensure [file ..]\n\
+                 \                             list-caretakers [file ..]\n\
+                 \                             list-users\n"
 
 runEnsure :: Text -> IO ()
 runEnsure inputText = getApiToken >>= ensure inputText
-
 runListCaretakers :: Text -> IO ()
 runListCaretakers inputText = getApiToken >>= listCaretakers inputText
+runListUsers :: Text -> IO ()
+runListUsers inputText = getApiToken >>= listUsers inputText
 
 getApiToken :: IO ByteString
 getApiToken = BS.pack . fromMaybe (error "API_TOKEN env variable not set") <$>

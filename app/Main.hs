@@ -10,6 +10,7 @@ import Data.ByteString.Char8 as BS (pack)
 import Prelude hiding (getContents, readFile)
 import Data.Text (Text)
 import Data.Text.IO (getContents, readFile)
+import Data.List (elem, isPrefixOf, null)
 import Data.Maybe (fromMaybe)
 import Data.Traversable (traverse)
 import Data.Monoid (mconcat)
@@ -18,12 +19,15 @@ main :: IO ()
 main = getArgs >>= parse
 
 parse :: [String] -> IO ()
-parse ("ensure":rest) =
+parse args
+  |  elem "-h" flags
+  || elem "--help" flags = usage >> exitSuccess
+  | not (null flags) = usage >> exitFailure
+  where flags = filter ("-" `isPrefixOf`) args
+parse ("ensure":rest) = runEnsure =<<
     case rest of
-      ["-h"]     -> usage >> exitSuccess
-      ["--help"] -> usage >> exitSuccess
-      []         -> runEnsure =<< getContents
-      fs         -> runEnsure =<< (mconcat <$> traverse readFile fs)
+      [] -> getContents
+      fs -> mconcat <$> traverse readFile fs
 parse _ = usage >> exitFailure
 
 usage :: IO ()

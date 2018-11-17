@@ -8,11 +8,11 @@ module Lib
     , listUsers
     ) where
 
-import Prelude hiding (id)
 import Slack.Util (slackGet, Token)
-import Slack.Channel (findChannel, createChannel, inviteMembers, getChannelMembers, setChannelTopic)
+import Slack.Channel as Channel (findChannel, createChannel, inviteMembers, getChannelMembers, setChannelTopic
+  , Channel, id, topic)
 import Slack.Group (getGroupMembers, setGroupMembers, setGroupChannels, createGroup)
-import Slack.User (getUser, listAllUsers, id, displayName)
+import Slack.User as User (getUser, listAllUsers, id, displayName)
 import Dhall (input, auto, Interpret)
 import Data.Text (Text)
 import Text.Printf (printf)
@@ -22,8 +22,7 @@ import Data.Foldable (traverse_)
 import Data.Traversable (traverse)
 import Control.Monad (unless, void)
 import Network.Wreq (defaults, param)
-import Data.Aeson (Value)
-import Control.Lens ((&), (.~), (^?), (^?!), (^..), (^.))
+import Control.Lens ((&), (.~), (^?), (^..), (^.))
 import Data.Aeson.Lens (key, values, _String)
 import Data.List (find, null, (\\), cycle, zip3)
 import Control.Monad.Trans.Class (lift)
@@ -58,7 +57,7 @@ listUsers :: Token -> IO ()
 listUsers apiToken = (void . runExceptT) $
     traverse_ (lift . printLine) =<< listAllUsers apiToken
   where
-    printLine user = printf "%s: %s\n" (user ^. id) (user ^. displayName)
+    printLine user = printf "%s: %s\n" (user ^. User.id) (user ^. displayName)
 
 ensureStateOfAllTeams :: Token -> [InputRecord] -> IO ()
 ensureStateOfAllTeams apiToken records = do
@@ -74,11 +73,11 @@ ensureStateOfAllTeams apiToken records = do
 ensureTeamState :: Token -> InputRecord -> ExceptT Text IO ()
 ensureTeamState apiToken record = do
     channel <- findOrCreateChannel apiToken channelName userIDs
-    let channelID = channel ^?! key "id" . _String
+    let channelID = channel ^. Channel.id
     lift $ print $ "cid: " <> channelID
     ensureAllMembersPresent apiToken channelID userIDs
     caretakerID <- lift $ getCaretaker userIDs
-    ensureChannelTopic apiToken channel (topic record) caretakerID
+    ensureChannelTopic apiToken channel (Lib.topic record) caretakerID
     ensureGroupState apiToken teamGroupHandle teamGroupName [channelID] userIDs
     ensureGroupState apiToken caretakerGroupHandle caretakerGroupName [channelID] [caretakerID]
   where
@@ -89,21 +88,21 @@ ensureTeamState apiToken record = do
     caretakerGroupName = teamGroupName <> " caretaker"
     userIDs = members record
 
-ensureChannelTopic :: Token -> Value -> (Text -> Text) -> Text -> ExceptT Text IO ()
+ensureChannelTopic :: Token -> Channel -> (Text -> Text) -> Text -> ExceptT Text IO ()
 ensureChannelTopic apiToken channel buildTopic caretakerID = do
     caretakerDisplayName <- (^. displayName) <$> getUser apiToken caretakerID
     let newTopic = buildTopic caretakerDisplayName
     unless (currentTopic == newTopic) $ setChannelTopic apiToken channelID newTopic
   where
-    channelID = channel ^?! key "id" . _String
-    currentTopic = channel ^?! key "topic" . key "value" . _String
+    channelID = channel ^. Channel.id
+    currentTopic = channel ^. Channel.topic
 
 getCaretaker :: [Text] -> IO Text
 getCaretaker userIDs = do
     (_, currentUtcWeek, _) <- (toWeekDate . utctDay) <$> getCurrentTime
     return $ cycle userIDs !! currentUtcWeek
 
-findOrCreateChannel :: Token -> Text -> [Text] -> ExceptT Text IO Value
+findOrCreateChannel :: Token -> Text -> [Text] -> ExceptT Text IO Channel
 findOrCreateChannel apiToken name userIDs = do
     current <- findChannel name apiToken
     maybe (createChannel apiToken name userIDs) return current

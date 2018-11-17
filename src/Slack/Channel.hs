@@ -1,5 +1,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Slack.Channel
     ( findChannel
@@ -7,32 +10,55 @@ module Slack.Channel
     , inviteMembers
     , getChannelMembers
     , setChannelTopic
+    , Channel
+    , id
+    , topic
     ) where
 
-import Slack.Util (slackGetPaginated, slackPost, Token)
+import Prelude hiding (id)
+import Slack.Util (slackGetPaginated, slackPost, Token, fromJSON)
 import Data.Text (Text, unpack)
 import Data.Traversable (traverse)
 import Network.Wreq (defaults, param)
-import Data.Aeson ((.=), Value)
-import Control.Lens ((&), (.~), (^?), (^..))
+import Control.Lens ((&), (.~), (^?), (^.), (^..))
+import Control.Lens.TH (makeLenses)
+import Data.Aeson ((.=), FromJSON(parseJSON), withObject, (.:))
 import Data.Aeson.Lens (key, values, _String)
+import GHC.Generics (Generic)
 import Data.List as L (find, intercalate)
 import Control.Monad.Trans.Except (ExceptT)
 import Control.Error.Util ((??))
 
-findChannel :: Text -> Token -> ExceptT Text IO (Maybe Value)
-findChannel name apiToken = do
-    respBodies <- slackGetPaginated apiToken defaults "conversations.list"
-    return $ find (\x -> (x ^? key "name". _String) == Just name) $
-        respBodies ^.. traverse . key "channels" . values
+data Channel = Channel { _id :: Text
+                       , _name :: Text
+                       , _topic :: Text
+                       } deriving (Generic, Show)
+$(makeLenses ''Channel)
 
-createChannel :: Token -> Text -> [Text] -> ExceptT Text IO Value
-createChannel apiToken name userIDs = do
-    let params = [ "name" .= name
+instance FromJSON Channel where
+    parseJSON = withObject "Channel" $ \o -> do
+        _id <- o .: "id"
+        _name <- o .: "name"
+        topicObject <- o .: "topic"
+        _topic <- topicObject .: "value"
+        return Channel{..}
+
+findChannel :: Text -> Token -> ExceptT Text IO (Maybe Channel)
+findChannel expectedName apiToken = do
+    respBodies <- slackGetPaginated apiToken defaults "conversations.list"
+    channels <- traverse fromJSON =<< concatMap (^.. values) <$>
+        (traverse (^? key "channels") respBodies ??
+            "\"users.list\" response didn't include a \"channels\" field")
+    return $ find (\x -> (x ^. name) == expectedName) channels
+
+createChannel :: Token -> Text -> [Text] -> ExceptT Text IO Channel
+createChannel apiToken newName userIDs = do
+    let params = [ "name" .= newName
                  , "user_ids" .= intercalate "," (unpack <$> userIDs)
                  ]
     respBody <- slackPost apiToken params "conversations.create"
-    (respBody ^? key "channel") ?? "\"conversations.create\" response didn't include a \"channel\" key"
+    val <- (respBody ^? key "channel") ?? "\"conversations.create\" response didn't include a \"channel\" key"
+    fromJSON val
 
 inviteMembers :: Token -> Text -> [Text] -> ExceptT Text IO ()
 inviteMembers apiToken channelID userIDs = do

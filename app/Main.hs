@@ -3,14 +3,35 @@
 module Main where
 
 import Lib (ensure)
-import System.Environment (lookupEnv)
+import System.Environment (lookupEnv, getArgs)
+import System.Exit (exitSuccess, exitFailure)
+import Data.ByteString (ByteString)
 import Data.ByteString.Char8 as BS (pack)
-import Prelude hiding (getContents)
-import Data.Text.IO (getContents)
+import Prelude hiding (getContents, readFile)
+import Data.Text (Text)
+import Data.Text.IO (getContents, readFile)
 import Data.Maybe (fromMaybe)
+import Data.Traversable (traverse)
+import Data.Monoid (mconcat)
 
 main :: IO ()
-main = do
-    inputText <- getContents
-    apiToken <- fromMaybe (error "API_TOKEN env variable not set") <$> lookupEnv "API_TOKEN"
-    ensure inputText (BS.pack apiToken)
+main = getArgs >>= parse
+
+parse :: [String] -> IO ()
+parse ("ensure":rest) =
+    case rest of
+      ["-h"]     -> usage >> exitSuccess
+      ["--help"] -> usage >> exitSuccess
+      []         -> runEnsure =<< getContents
+      fs         -> runEnsure =<< (mconcat <$> traverse readFile fs)
+parse _ = usage >> exitFailure
+
+usage :: IO ()
+usage = putStrLn "Usage: take-care ensure [-h|--help] [file ..]"
+
+runEnsure :: Text -> IO ()
+runEnsure inputText = getApiToken >>= ensure inputText
+
+getApiToken :: IO ByteString
+getApiToken = BS.pack . fromMaybe (error "API_TOKEN env variable not set") <$>
+        lookupEnv "API_TOKEN"

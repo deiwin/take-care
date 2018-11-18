@@ -8,6 +8,7 @@ module Lib
     , listUsers
     ) where
 
+import Prelude hiding (unlines)
 import Slack.Util (Token)
 import Slack.Channel as Channel (findChannel, createChannel, inviteMembers, getChannelMembers
   , setChannelTopic, Channel, id, topic)
@@ -15,17 +16,16 @@ import Slack.Group as Group (getGroupMembers, setGroupMembers, setGroupChannels,
   , createGroup, id, channelIDs)
 import Slack.User as User (getUser, listAllUsers, id, displayName)
 import Dhall (input, auto, Interpret)
-import Data.Text (Text)
+import Data.Text (Text, unlines, pack)
 import Text.Printf (printf)
 import GHC.Generics (Generic)
 import Text.Show.Functions ()
-import Data.Foldable (traverse_)
 import Data.Traversable (traverse)
-import Control.Monad (unless, void)
+import Control.Monad (unless)
 import Control.Lens ((^.))
 import Data.List (null, (\\), cycle, zip3)
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Except (ExceptT, runExceptT)
+import Control.Monad.Trans.Except (ExceptT)
 import Data.Time.Clock (getCurrentTime, UTCTime(..))
 import Data.Time.Calendar.WeekDate (toWeekDate)
 
@@ -36,44 +36,39 @@ data InputRecord = InputRecord { members :: [Text]
 
 instance Interpret InputRecord
 
-ensure :: Text -> Token -> IO ()
+ensure :: Text -> Token -> ExceptT Text IO Text
 ensure inputText apiToken = do
-    records <- input auto inputText
-    traverse_ print records
-    ensureStateOfAllTeams apiToken records
-    return ()
-
-listCaretakers :: Text -> Token -> IO ()
-listCaretakers inputText apiToken = (void . runExceptT) $ do
     records <- lift $ input auto inputText
+    teamResults <- traverse (wrapTeamResult $ ensureTeamState apiToken) records
     caretakerIDs <- traverse (lift . getCaretaker) (members <$> records)
-    caretakerDisplayNames <- traverse (fmap (^. displayName) . getUser apiToken) caretakerIDs
-    traverse_ (lift . printLine) $ zip3 (team <$> records) caretakerDisplayNames caretakerIDs
+    groupResult <- wrapGroupResult <$>
+        ensureGroupState apiToken groupHandle groupName groupChannels caretakerIDs
+    return $ unlines (teamResults ++ [groupResult])
   where
-    printLine (teamName, userName, userID) = printf "Team %s: %s (%s)\n" teamName userName userID
-
-listUsers :: Token -> IO ()
-listUsers apiToken = (void . runExceptT) $
-    traverse_ (lift . printLine) =<< listAllUsers apiToken
-  where
-    printLine user = printf "%s: %s\n" (user ^. User.id) (user ^. displayName)
-
-ensureStateOfAllTeams :: Token -> [InputRecord] -> IO ()
-ensureStateOfAllTeams apiToken records = do
-    caretakerIDs <- traverse getCaretaker (members <$> records)
-    results <- traverse (runExceptT . ensureTeamState apiToken) records
-    result <- runExceptT $ ensureGroupState apiToken groupHandle groupName groupChannels caretakerIDs
-    print (results ++ [result])
-  where
+    wrapTeamResult f record = const ("Team " <> team record <> ": success!") <$> f record
+    wrapGroupResult = const "Caretakers group: success!"
     groupHandle = "caretakers"
     groupName = "Current caretakers of every team"
     groupChannels = []
+
+listCaretakers :: Text -> Token -> ExceptT Text IO Text
+listCaretakers inputText apiToken = do
+    records <- lift $ input auto inputText
+    caretakerIDs <- traverse (lift . getCaretaker) (members <$> records)
+    caretakerDisplayNames <- traverse (fmap (^. displayName) . getUser apiToken) caretakerIDs
+    return $ unlines $ formatLine <$> zip3 (team <$> records) caretakerDisplayNames caretakerIDs
+  where
+    formatLine (teamName, userName, userID) = pack $ printf "Team %s: %s (%s)" teamName userName userID
+
+listUsers :: Token -> ExceptT Text IO Text
+listUsers apiToken = (unlines . fmap formatLine) <$> listAllUsers apiToken
+  where
+    formatLine user = pack $ printf "%s: %s" (user ^. User.id) (user ^. displayName)
 
 ensureTeamState :: Token -> InputRecord -> ExceptT Text IO ()
 ensureTeamState apiToken record = do
     channel <- findOrCreateChannel apiToken channelName userIDs
     let channelID = channel ^. Channel.id
-    lift $ print $ "cid: " <> channelID
     ensureAllMembersPresent apiToken channelID userIDs
     caretakerID <- lift $ getCaretaker userIDs
     ensureChannelTopic apiToken channel (Lib.topic record) caretakerID

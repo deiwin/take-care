@@ -10,10 +10,12 @@ import Data.ByteString.Char8 as BS (pack)
 import Prelude hiding (getContents, readFile)
 import Data.Text (Text)
 import Data.Text.IO (getContents, readFile)
+import qualified Data.Text.IO as TIO (putStrLn)
 import Data.List (elem, isPrefixOf, null)
 import Data.Maybe (fromMaybe)
 import Data.Traversable (traverse)
 import Data.Monoid (mconcat)
+import Control.Monad.Trans.Except (ExceptT, runExceptT)
 
 main :: IO ()
 main = getArgs >>= parse
@@ -35,11 +37,17 @@ usage = putStrLn "Usage: take-care [-h|--help] ensure [file ..]\n\
                  \                             list-users\n"
 
 runEnsure :: Text -> IO ()
-runEnsure inputText = getApiToken >>= ensure inputText
+runEnsure inputText = getApiToken >>= (handleResult . ensure inputText)
 runListCaretakers :: Text -> IO ()
-runListCaretakers inputText = getApiToken >>= listCaretakers inputText
+runListCaretakers inputText = getApiToken >>= (handleResult . listCaretakers inputText)
 runListUsers :: IO ()
-runListUsers = getApiToken >>= listUsers
+runListUsers = getApiToken >>= (handleResult . listUsers)
+
+handleResult :: ExceptT Text IO Text -> IO ()
+handleResult result = runExceptT result >>= logResult
+    where
+      logResult (Left message) = TIO.putStrLn message >> exitFailure
+      logResult (Right message) = TIO.putStrLn message >> exitSuccess
 
 getApiToken :: IO ByteString
 getApiToken = BS.pack . fromMaybe (error "API_TOKEN env variable not set") <$>

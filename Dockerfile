@@ -1,6 +1,6 @@
 FROM fpco/stack-build:lts-12.15 as builder
 
-ADD stack.yaml package.yaml take-care.cabal ./
+ADD stack.yaml package.yaml ./
 RUN stack -j "$(nproc)" --system-ghc build --only-dependencies
 
 ADD ./ ./

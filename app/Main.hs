@@ -11,7 +11,7 @@ import Prelude hiding (getContents, readFile)
 import Data.Text (Text)
 import Data.Text.IO (getContents, readFile)
 import qualified Data.Text.IO as TIO (putStrLn)
-import Data.List (elem, isPrefixOf, null)
+import Data.List (elem, isPrefixOf, null, intercalate)
 import Data.Maybe (fromMaybe)
 import Data.Traversable (traverse)
 import Data.Monoid (mconcat)
@@ -24,8 +24,10 @@ parse :: [String] -> IO ()
 parse args
   |  elem "-h" flags
   || elem "--help" flags = usage >> exitSuccess
-  | not (null flags) = usage >> exitFailure
-  where flags = filter ("-" `isPrefixOf`) args
+  | not (null flags) = printFlags >> usage >> exitFailure
+  where
+    flags = filter ("-" `isPrefixOf`) args
+    printFlags = putStrLn ("Unknown flags: " <> intercalate "," flags)
 parse ("ensure":rest) = runEnsure =<< readInput rest
 parse ("list-caretakers":rest) = runListCaretakers =<< readInput rest
 parse ["list-users"] = runListUsers

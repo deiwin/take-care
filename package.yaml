@@ -38,7 +38,7 @@ library:
   source-dirs: src
 
 executables:
-  take-care-exe:
+  take-care:
     main:                Main.hs
     source-dirs:         app
     ghc-options:

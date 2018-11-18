@@ -1,10 +1,12 @@
 FROM fpco/stack-build:lts-12.15 as builder
 
+ARG JOBS=1
+
 ADD stack.yaml package.yaml ./
-RUN stack -j "$(nproc)" --system-ghc build --only-dependencies
+RUN stack -j $JOBS --system-ghc build --only-dependencies
 
 ADD ./ ./
-RUN stack -j "$(nproc)" --system-ghc build --test --keep-going --copy-bins
+RUN stack -j $JOBS --system-ghc build --test --keep-going --copy-bins
 
 FROM debian:9.6
 

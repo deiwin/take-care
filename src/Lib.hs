@@ -8,7 +8,7 @@ module Lib
     , listUsers
     ) where
 
-import Prelude hiding (unlines)
+import Prelude hiding (unlines, filter)
 import Slack.Util (Token)
 import Slack.Channel as Channel (findChannel, createChannel, inviteMembers, getChannelMembers
   , setChannelTopic, Channel, id, topic)
@@ -16,14 +16,14 @@ import Slack.Group as Group (getGroupMembers, setGroupMembers, setGroupChannels,
   , createGroup, id, channelIDs)
 import Slack.User as User (getUser, listAllUsers, id, displayName)
 import Dhall (input, auto, Interpret)
-import Data.Text (Text, unlines, pack)
+import Data.Text (Text, unlines, pack, filter)
 import Text.Printf (printf)
 import GHC.Generics (Generic)
 import Text.Show.Functions ()
 import Data.Traversable (traverse)
 import Control.Monad (unless)
 import Control.Lens ((^.))
-import Data.List (null, (\\), cycle, zip3)
+import Data.List (null, (\\), cycle, zip3, elem)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (ExceptT)
 import Data.Time.Clock (getCurrentTime, UTCTime(..))
@@ -86,10 +86,13 @@ ensureChannelTopic :: Token -> Channel -> (Text -> Text) -> Text -> ExceptT Text
 ensureChannelTopic apiToken channel buildTopic caretakerID = do
     caretakerDisplayName <- (^. displayName) <$> getUser apiToken caretakerID
     let newTopic = buildTopic caretakerDisplayName
-    unless (currentTopic == newTopic) $ setChannelTopic apiToken channelID newTopic
+    unless (same currentTopic newTopic) $ setChannelTopic apiToken channelID newTopic
   where
     channelID = channel ^. Channel.id
     currentTopic = channel ^. Channel.topic
+    same oldTopic newTopic = oldTopic == newTopic || clean oldTopic == clean newTopic
+    clean = filter (not . potentialAddedChar)
+    potentialAddedChar c = c `elem` ['<', '>']
 
 getCaretaker :: [Text] -> IO Text
 getCaretaker userIDs = do

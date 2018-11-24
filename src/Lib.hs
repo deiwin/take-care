@@ -6,7 +6,8 @@ module Lib
     ( ensure
     , listCaretakers
     , listUsers
-    ) where
+    )
+where
 
 import Prelude hiding (unlines, filter)
 import Slack.Util (Token)
@@ -38,32 +39,29 @@ instance Interpret InputRecord
 
 ensure :: Text -> Token -> ExceptT Text IO Text
 ensure inputText apiToken = do
-    records <- lift $ input auto inputText
-    teamResults <- traverse (wrapTeamResult $ ensureTeamState apiToken) records
+    records      <- lift $ input auto inputText
+    teamResults  <- traverse (wrapTeamResult $ ensureTeamState apiToken) records
     caretakerIDs <- traverse (lift . getCaretaker) (members <$> records)
-    groupResult <- wrapGroupResult <$>
-        ensureGroupState apiToken groupHandle groupName groupChannels caretakerIDs
+    groupResult  <- wrapGroupResult <$> ensureGroupState apiToken groupHandle groupName groupChannels caretakerIDs
     return $ unlines (teamResults ++ [groupResult])
   where
     wrapTeamResult f record = const ("Team " <> team record <> ": success!") <$> f record
     wrapGroupResult = const "Caretakers group: success!"
-    groupHandle = "caretakers"
-    groupName = "Current caretakers of every team"
-    groupChannels = []
+    groupHandle     = "caretakers"
+    groupName       = "Current caretakers of every team"
+    groupChannels   = []
 
 listCaretakers :: Text -> Token -> ExceptT Text IO Text
 listCaretakers inputText apiToken = do
-    records <- lift $ input auto inputText
-    caretakerIDs <- traverse (lift . getCaretaker) (members <$> records)
+    records               <- lift $ input auto inputText
+    caretakerIDs          <- traverse (lift . getCaretaker) (members <$> records)
     caretakerDisplayNames <- traverse (fmap (^. displayName) . getUser apiToken) caretakerIDs
     return $ unlines $ formatLine <$> zip3 (team <$> records) caretakerDisplayNames caretakerIDs
-  where
-    formatLine (teamName, userName, userID) = pack $ printf "Team %s: %s (%s)" teamName userName userID
+    where formatLine (teamName, userName, userID) = pack $ printf "Team %s: %s (%s)" teamName userName userID
 
 listUsers :: Token -> ExceptT Text IO Text
 listUsers apiToken = unlines . fmap formatLine <$> listAllUsers apiToken
-  where
-    formatLine user = pack $ printf "%s: %s" (user ^. User.id) (user ^. displayName)
+    where formatLine user = pack $ printf "%s: %s" (user ^. User.id) (user ^. displayName)
 
 ensureTeamState :: Token -> InputRecord -> ExceptT Text IO ()
 ensureTeamState apiToken record = do
@@ -72,15 +70,15 @@ ensureTeamState apiToken record = do
     ensureAllMembersPresent apiToken channelID userIDs
     caretakerID <- lift $ getCaretaker userIDs
     ensureChannelTopic apiToken channel (Lib.topic record) caretakerID
-    ensureGroupState apiToken teamGroupHandle teamGroupName [channelID] userIDs
+    ensureGroupState apiToken teamGroupHandle      teamGroupName      [channelID] userIDs
     ensureGroupState apiToken caretakerGroupHandle caretakerGroupName [channelID] [caretakerID]
   where
-    channelName = "tm-" <> team record
-    teamGroupHandle = team record
-    teamGroupName = "Team " <> teamGroupHandle
+    channelName          = "tm-" <> team record
+    teamGroupHandle      = team record
+    teamGroupName        = "Team " <> teamGroupHandle
     caretakerGroupHandle = teamGroupHandle <> "-caretaker"
-    caretakerGroupName = teamGroupName <> " caretaker"
-    userIDs = members record
+    caretakerGroupName   = teamGroupName <> " caretaker"
+    userIDs              = members record
 
 ensureChannelTopic :: Token -> Channel -> (Text -> Text) -> Text -> ExceptT Text IO ()
 ensureChannelTopic apiToken channel buildTopic caretakerID = do
@@ -88,7 +86,7 @@ ensureChannelTopic apiToken channel buildTopic caretakerID = do
     let newTopic = buildTopic caretakerDisplayName
     unless (same currentTopic newTopic) $ setChannelTopic apiToken channelID newTopic
   where
-    channelID = channel ^. Channel.id
+    channelID    = channel ^. Channel.id
     currentTopic = channel ^. Channel.topic
     same oldTopic newTopic = oldTopic == newTopic || clean oldTopic == clean newTopic
     clean = filter (not . potentialAddedChar)
@@ -107,7 +105,7 @@ findOrCreateChannel apiToken name userIDs = do
 ensureGroupState :: Token -> Text -> Text -> [Text] -> [Text] -> ExceptT Text IO ()
 ensureGroupState apiToken groupHandle groupName defaultChannelIDs userIDs = do
     existingGroup <- findGroup apiToken groupHandle
-    group <- maybe createNew return existingGroup
+    group         <- maybe createNew return existingGroup
     let groupID = group ^. Group.id
 
     currentMembers <- getGroupMembers apiToken groupID

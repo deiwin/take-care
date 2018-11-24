@@ -14,7 +14,8 @@ module Slack.Group
     , id
     , handle
     , channelIDs
-    ) where
+    )
+where
 
 import Prelude hiding (id)
 import Slack.Util (slackGet, slackPost, Token, fromJSON)
@@ -70,9 +71,10 @@ findGroup :: Token -> Text -> ExceptT Text IO (Maybe Group)
 findGroup apiToken expectedHandle = do
     let opts = defaults & param "include_disabled" .~ ["true"]
     respBody <- slackGet apiToken opts "usergroups.list"
-    groups <- traverse fromJSON =<< (^.. values) <$>
-        ((respBody ^? key "usergroups") ??
-            "\"users.list\" response didn't include a \"channels\" field")
+    groups   <-
+        traverse fromJSON
+        =<< (^.. values)
+        <$> ((respBody ^? key "usergroups") ?? "\"users.list\" response didn't include a \"channels\" field")
     return $ find (\x -> (x ^. handle) == expectedHandle) groups
 
 createGroup :: Token -> Text -> Text -> [Text] -> ExceptT Text IO Group
@@ -82,5 +84,5 @@ createGroup apiToken groupHandle groupName defaultChannelIDs = do
                  , "channels" .= intercalate "," (unpack <$> defaultChannelIDs)
                  ]
     respBody <- slackPost apiToken params "usergroups.create"
-    val <- (respBody ^? key "usergroup") ?? "\"usergroups.create\" response didn't include a \"usergroup\" key"
+    val      <- (respBody ^? key "usergroup") ?? "\"usergroups.create\" response didn't include a \"usergroup\" key"
     fromJSON val

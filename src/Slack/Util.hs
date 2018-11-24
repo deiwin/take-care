@@ -8,7 +8,8 @@ module Slack.Util
     , slackPost
     , fromJSON
     , Token
-    ) where
+    )
+where
 
 import Prelude hiding (error)
 import Data.Text as T (Text, pack, null)
@@ -34,7 +35,7 @@ slackURL = ("https://slack.com/api/" ++)
 slackGet :: Token -> Options -> String -> ExceptT Text IO Value
 slackGet apiToken opts method = do
     let optsWithAuth = opts & auth ?~ oauth2Bearer apiToken
-    let url = slackURL method
+    let url          = slackURL method
     resp <- lift (asValue =<< getWith optsWithAuth url)
     hoistEither $ handleSlackError "GET" method resp
 
@@ -44,35 +45,33 @@ slackGetPaginated' :: Maybe Text -> [Value] -> Token -> Options -> String -> Exc
 slackGetPaginated' cursor !acc apiToken opts method = do
     let optsWithCursor = opts & param "cursor" .~ maybeToList cursor
     respBody <- slackGet apiToken optsWithCursor method
-    let
-      nextCursor = mfilter (not . T.null) $
-          respBody ^? key "response_metadata" . key "next_cursor" . _String
-    let nextAcc = respBody : acc
+    let nextCursor = mfilter (not . T.null) $ respBody ^? key "response_metadata" . key "next_cursor" . _String
+    let nextAcc    = respBody : acc
     case nextCursor of
-      Just _ -> slackGetPaginated' nextCursor nextAcc apiToken opts method
-      Nothing -> return $ reverse nextAcc
+        Just _  -> slackGetPaginated' nextCursor nextAcc apiToken opts method
+        Nothing -> return $ reverse nextAcc
 
 slackPost :: Token -> [Pair] -> String -> ExceptT Text IO Value
 slackPost apiToken params method = do
     let optsWithAuth = defaults & auth ?~ oauth2Bearer apiToken
-    let url = slackURL method
-    let body = toJSON $ object params
+    let url          = slackURL method
+    let body         = toJSON $ object params
     resp <- lift $ asValue =<< postWith optsWithAuth url body
     hoistEither $ handleSlackError "POST" method resp
 
 handleSlackError :: Text -> String -> Response Value -> Either Text Value
 handleSlackError httpMethod method resp =
     let respBody = resp ^. responseBody
-        ok = respBody ^?! key "ok" . _Bool
-        error = respBody ^. key "error" . _String
-        detail = respBody ^? key "detail" . _String
-     in if ok then
-            Right respBody
-        else
-            Left (httpMethod <> " " <> T.pack method <> ": " <> error <> maybe "" (" - " <>) detail)
+        ok       = respBody ^?! key "ok" . _Bool
+        error    = respBody ^. key "error" . _String
+        detail   = respBody ^? key "detail" . _String
+    in  if ok
+            then Right respBody
+            else Left (httpMethod <> " " <> T.pack method <> ": " <> error <> maybe "" (" - " <>) detail)
 
 fromJSON :: (FromJSON a, Monad m) => Value -> ExceptT Text m a
-fromJSON = hoistEither . hoistResult  . A.fromJSON
-    where hoistResult res = case res of
-                              Error e -> Left $ pack e
-                              Success o -> Right o
+fromJSON = hoistEither . hoistResult . A.fromJSON
+  where
+    hoistResult res = case res of
+        Error   e -> Left $ pack e
+        Success o -> Right o

@@ -13,7 +13,8 @@ module Slack.Channel
     , Channel
     , id
     , topic
-    ) where
+    )
+where
 
 import Prelude hiding (id)
 import Slack.Util (slackGetPaginated, slackPost, Token, fromJSON)
@@ -46,9 +47,10 @@ instance FromJSON Channel where
 findChannel :: Text -> Token -> ExceptT Text IO (Maybe Channel)
 findChannel expectedName apiToken = do
     respBodies <- slackGetPaginated apiToken defaults "conversations.list"
-    channels <- traverse fromJSON =<< concatMap (^.. values) <$>
-        (traverse (^? key "channels") respBodies ??
-            "\"users.list\" response didn't include a \"channels\" field")
+    channels   <-
+        traverse fromJSON
+        =<< concatMap (^.. values)
+        <$> (traverse (^? key "channels") respBodies ?? "\"users.list\" response didn't include a \"channels\" field")
     return $ find (\x -> (x ^. name) == expectedName) channels
 
 createChannel :: Token -> Text -> [Text] -> ExceptT Text IO Channel
@@ -57,7 +59,7 @@ createChannel apiToken newName userIDs = do
                  , "user_ids" .= intercalate "," (unpack <$> userIDs)
                  ]
     respBody <- slackPost apiToken params "conversations.create"
-    val <- (respBody ^? key "channel") ?? "\"conversations.create\" response didn't include a \"channel\" key"
+    val      <- (respBody ^? key "channel") ?? "\"conversations.create\" response didn't include a \"channel\" key"
     fromJSON val
 
 inviteMembers :: Token -> Text -> [Text] -> ExceptT Text IO ()

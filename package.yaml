@@ -21,21 +21,20 @@ description:         Please see the README on GitHub at <https://github.com/deiw
 
 dependencies:
 - base >= 4.7 && < 5
-- dhall
-- text
-- filepath
-- wreq
-- aeson
-- lens
-- lens-aeson
-- containers
-- bytestring
-- transformers
-- errors
-- time
 
 library:
   source-dirs: src
+  dependencies:
+  - aeson
+  - bytestring
+  - dhall
+  - errors
+  - lens
+  - lens-aeson
+  - text
+  - time
+  - transformers
+  - wreq
 
 executables:
   take-care:
@@ -46,7 +45,10 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
+    - bytestring
     - take-care
+    - text
+    - transformers
 
 tests:
   take-care-test:

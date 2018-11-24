@@ -61,7 +61,7 @@ listCaretakers inputText apiToken = do
     formatLine (teamName, userName, userID) = pack $ printf "Team %s: %s (%s)" teamName userName userID
 
 listUsers :: Token -> ExceptT Text IO Text
-listUsers apiToken = (unlines . fmap formatLine) <$> listAllUsers apiToken
+listUsers apiToken = unlines . fmap formatLine <$> listAllUsers apiToken
   where
     formatLine user = pack $ printf "%s: %s" (user ^. User.id) (user ^. displayName)
 
@@ -96,7 +96,7 @@ ensureChannelTopic apiToken channel buildTopic caretakerID = do
 
 getCaretaker :: [Text] -> IO Text
 getCaretaker userIDs = do
-    (_, currentUtcWeek, _) <- (toWeekDate . utctDay) <$> getCurrentTime
+    (_, currentUtcWeek, _) <- toWeekDate . utctDay <$> getCurrentTime
     return $ cycle userIDs !! currentUtcWeek
 
 findOrCreateChannel :: Token -> Text -> [Text] -> ExceptT Text IO Channel

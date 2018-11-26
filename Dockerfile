@@ -8,6 +8,9 @@ RUN stack -j "$(nproc)" --system-ghc build --test --keep-going --copy-bins
 
 FROM debian:9.6
 
+ENV LANG C.UTF-8
+ENV LC_ALL C.UTF-8
+
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     libgmp-dev \

@@ -30,12 +30,12 @@ import Control.Monad.Trans.Except (ExceptT)
 import Data.Time.Clock (getCurrentTime, UTCTime(..))
 import Data.Time.Calendar.WeekDate (toWeekDate)
 
-data InputRecord = InputRecord { members :: [Text]
-                               , team :: Text -- TODO should be max 21 chars with the tm- prefix, so 18
-                               , topic :: Text -> Text
-                               } deriving (Generic, Show)
+data Team = Team { members :: [Text]
+                 , team :: Text -- TODO should be max 21 chars with the tm- prefix, so 18
+                 , topic :: Text -> Text
+                 } deriving (Generic, Show)
 
-instance Interpret InputRecord
+instance Interpret Team
 
 ensure :: Text -> Token -> ExceptT Text IO Text
 ensure inputText apiToken = do
@@ -63,7 +63,7 @@ listUsers :: Token -> ExceptT Text IO Text
 listUsers apiToken = unlines . fmap formatLine <$> listAllUsers apiToken
     where formatLine user = pack $ printf "%s: %s" (user ^. User.id) (user ^. displayName)
 
-ensureTeamState :: Token -> InputRecord -> ExceptT Text IO ()
+ensureTeamState :: Token -> Team -> ExceptT Text IO ()
 ensureTeamState apiToken record = do
     channel <- findOrCreateChannel apiToken channelName userIDs
     let channelID = channel ^. Channel.id

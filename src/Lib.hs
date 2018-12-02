@@ -99,7 +99,7 @@ getCaretaker userIDs = do
 
 findOrCreateChannel :: Token -> Text -> [Text] -> ExceptT Text IO Channel
 findOrCreateChannel apiToken name userIDs = do
-    current <- findChannel name apiToken
+    current <- findChannel apiToken name
     maybe (createChannel apiToken name userIDs) return current
 
 ensureGroupState :: Token -> Text -> Text -> [Text] -> [Text] -> ExceptT Text IO ()

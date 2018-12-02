@@ -44,8 +44,8 @@ instance FromJSON Channel where
         _topic <- topicObject .: "value"
         return Channel{..}
 
-findChannel :: Text -> Token -> ExceptT Text IO (Maybe Channel)
-findChannel expectedName apiToken = do
+findChannel :: Token -> Text -> ExceptT Text IO (Maybe Channel)
+findChannel apiToken expectedName = do
     respBodies <- slackGetPaginated apiToken defaults "conversations.list"
     channels   <-
         traverse fromJSON

@@ -30,22 +30,25 @@ import Control.Monad.Trans.Except (ExceptT)
 import Data.Time.Clock (getCurrentTime, UTCTime(..))
 import Data.Time.Calendar.WeekDate (toWeekDate)
 
+data Input = Input { teams :: [Team]
+                   } deriving (Generic, Show)
+instance Interpret Input
+
 data Team = Team { members :: [Text]
-                 , team :: Text -- TODO should be max 21 chars with the tm- prefix, so 18
+                 , name :: Text -- TODO should be max 21 chars with the tm- prefix, so 18
                  , topic :: Text -> Text
                  } deriving (Generic, Show)
-
 instance Interpret Team
 
 ensure :: Text -> Token -> ExceptT Text IO Text
 ensure inputText apiToken = do
-    records      <- lift $ input auto inputText
+    records      <- lift (teams <$> input auto inputText)
     teamResults  <- traverse (wrapTeamResult $ ensureTeamState apiToken) records
     caretakerIDs <- traverse (lift . getCaretaker) (members <$> records)
     groupResult  <- wrapGroupResult <$> ensureGroupState apiToken groupHandle groupName groupChannels caretakerIDs
     return $ unlines (teamResults ++ [groupResult])
   where
-    wrapTeamResult f record = const ("Team " <> team record <> ": success!") <$> f record
+    wrapTeamResult f team = const ("Team " <> name team <> ": success!") <$> f team
     wrapGroupResult = const "Caretakers group: success!"
     groupHandle     = "caretakers"
     groupName       = "Current caretakers of every team"
@@ -53,10 +56,10 @@ ensure inputText apiToken = do
 
 listCaretakers :: Text -> Token -> ExceptT Text IO Text
 listCaretakers inputText apiToken = do
-    records               <- lift $ input auto inputText
+    records               <- lift (teams <$> input auto inputText)
     caretakerIDs          <- traverse (lift . getCaretaker) (members <$> records)
     caretakerDisplayNames <- traverse (fmap (^. displayName) . getUser apiToken) caretakerIDs
-    return $ unlines $ formatLine <$> zip3 (team <$> records) caretakerDisplayNames caretakerIDs
+    return $ unlines $ formatLine <$> zip3 (name <$> records) caretakerDisplayNames caretakerIDs
     where formatLine (teamName, userName, userID) = pack $ printf "Team %s: %s (%s)" teamName userName userID
 
 listUsers :: Token -> ExceptT Text IO Text
@@ -64,21 +67,21 @@ listUsers apiToken = unlines . fmap formatLine <$> listAllUsers apiToken
     where formatLine user = pack $ printf "%s: %s" (user ^. User.id) (user ^. displayName)
 
 ensureTeamState :: Token -> Team -> ExceptT Text IO ()
-ensureTeamState apiToken record = do
+ensureTeamState apiToken team = do
     channel <- findOrCreateChannel apiToken channelName userIDs
     let channelID = channel ^. Channel.id
     ensureAllMembersPresent apiToken channelID userIDs
     caretakerID <- lift $ getCaretaker userIDs
-    ensureChannelTopic apiToken channel (Lib.topic record) caretakerID
+    ensureChannelTopic apiToken channel (Lib.topic team) caretakerID
     ensureGroupState apiToken teamGroupHandle      teamGroupName      [channelID] userIDs
     ensureGroupState apiToken caretakerGroupHandle caretakerGroupName [channelID] [caretakerID]
   where
-    channelName          = "tm-" <> team record
-    teamGroupHandle      = (team record) <> "-team"
-    teamGroupName        = "Team " <> (team record)
-    caretakerGroupHandle = (team record) <> "-caretaker"
+    channelName          = "tm-" <> name team
+    teamGroupHandle      = name team <> "-team"
+    teamGroupName        = "Team " <> name team
+    caretakerGroupHandle = name team <> "-caretaker"
     caretakerGroupName   = teamGroupName <> " caretaker"
-    userIDs              = members record
+    userIDs              = members team
 
 ensureChannelTopic :: Token -> Channel -> (Text -> Text) -> Text -> ExceptT Text IO ()
 ensureChannelTopic apiToken channel buildTopic caretakerID = do

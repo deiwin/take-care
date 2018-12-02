@@ -60,24 +60,25 @@ according to your needs. The configuration is written in [Dhall][3],
 a programmable configuration language with Haskell-like syntax.
 
 ```haskell
-[ { members = [ "U111ALICE" -- Alice
-              , "U22222BOB" -- Bob
-              , "U55555EVE" -- Eve
-              ]
-  , team = "design"
-  , topic = \(caretaker : Text) ->
-       let standup   = "Stand-up *9:30*"
-    in let board     = "Board :incoming_envelope: https://team.board/url"
-    in let separator = ":paw_prints:"
-    in "${standup} ${separator} ${board} ${separator} Caretaker ${caretaker}"
-  }
-, { members = [ "U333CAROL" -- Carol
-              , "U4444DAVE" -- Dave
-              ]
-  , team = "dev"
-  , topic = \(caretaker : Text) -> "${caretaker} is the caretaker"
-  }
-]
+{ teams = [ { members = [ "U111ALICE" -- Alice
+                        , "U22222BOB" -- Bob
+                        , "U55555EVE" -- Eve
+                        ]
+            , name = "design"
+            , topic = \(caretaker : Text) ->
+                 let standup   = "Stand-up *9:30*"
+              in let board     = "Board :incoming_envelope: https://team.board/url"
+              in let separator = ":paw_prints:"
+              in "${standup} ${separator} ${board} ${separator} Caretaker ${caretaker}"
+            }
+          , { members = [ "U333CAROL" -- Carol
+                        , "U4444DAVE" -- Dave
+                        ]
+            , name = "dev"
+            , topic = \(caretaker : Text) -> "${caretaker} is the caretaker"
+            }
+          ]
+}
 ```
 
 Verify the configuration with the `list-caretakers` command.

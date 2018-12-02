@@ -4,4 +4,6 @@
             , topic = \(careTaker : Text) -> "${careTaker} is the caretaker"
             }
           ]
+, commonChannels = [ "random"
+                   ]
 }

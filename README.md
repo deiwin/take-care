@@ -78,6 +78,9 @@ a programmable configuration language with Haskell-like syntax.
             , topic = \(caretaker : Text) -> "${caretaker} is the caretaker"
             }
           ]
+, commonChannels = [ "announcements"
+                   , "random"
+                   ]
 }
 ```
 
@@ -105,8 +108,9 @@ The `ensure` command _ensures_ that
   - include the configured team members, and
   - have their topic set per configuration;
 - user groups `@design-team` and `@dev-team`
-  - exist and
-  - consist of the configured team members;
+  - exist,
+  - consist of the configured team members, and
+  - invite all members to `commonChannels`;
 - user groups `@design-caretaker` and `@dev-caretaker`
   - exist and
   - consist of the current caretakers (one per team); and

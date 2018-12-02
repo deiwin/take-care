@@ -16,35 +16,43 @@ import Slack.Channel as Channel (findChannel, createChannel, inviteMembers, getC
 import Slack.Group as Group (getGroupMembers, setGroupMembers, setGroupChannels, findGroup
   , createGroup, id, channelIDs)
 import Slack.User as User (getUser, listAllUsers, id, displayName)
-import Dhall (input, auto, Interpret)
+import qualified Dhall (input, auto, Interpret)
 import Data.Text (Text, unlines, pack, filter)
 import Text.Printf (printf)
 import GHC.Generics (Generic)
 import Text.Show.Functions ()
 import Data.Traversable (traverse)
+import Data.Foldable (traverse_)
 import Control.Monad (unless)
 import Control.Lens ((^.))
 import Data.List (null, (\\), cycle, zip3, elem)
+import Data.Maybe (catMaybes)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (ExceptT)
 import Data.Time.Clock (getCurrentTime, UTCTime(..))
 import Data.Time.Calendar.WeekDate (toWeekDate)
 
 data Input = Input { teams :: [Team]
+                   , commonChannels :: [Text]
                    } deriving (Generic, Show)
-instance Interpret Input
+instance Dhall.Interpret Input
 
 data Team = Team { members :: [Text]
                  , name :: Text -- TODO should be max 21 chars with the tm- prefix, so 18
                  , topic :: Text -> Text
                  } deriving (Generic, Show)
-instance Interpret Team
+instance Dhall.Interpret Team
 
 ensure :: Text -> Token -> ExceptT Text IO Text
 ensure inputText apiToken = do
-    records      <- lift (teams <$> input auto inputText)
-    teamResults  <- traverse (wrapTeamResult $ ensureTeamState apiToken) records
-    caretakerIDs <- traverse (lift . getCaretaker) (members <$> records)
+    configuration <- lift $ Dhall.input Dhall.auto inputText
+    let teamRecords = teams configuration
+    -- TODO log as warning channel names that don't exist
+    commonChannelIDs <- fmap (fmap (^. Channel.id) . catMaybes)
+        $ traverse (findChannel apiToken)
+        $ commonChannels configuration
+    teamResults  <- traverse (wrapTeamResult $ ensureTeamState apiToken commonChannelIDs) teamRecords
+    caretakerIDs <- traverse (lift . getCaretaker) (members <$> teamRecords)
     groupResult  <- wrapGroupResult <$> ensureGroupState apiToken groupHandle groupName groupChannels caretakerIDs
     return $ unlines (teamResults ++ [groupResult])
   where
@@ -56,7 +64,7 @@ ensure inputText apiToken = do
 
 listCaretakers :: Text -> Token -> ExceptT Text IO Text
 listCaretakers inputText apiToken = do
-    records               <- lift (teams <$> input auto inputText)
+    records               <- lift (teams <$> Dhall.input Dhall.auto inputText)
     caretakerIDs          <- traverse (lift . getCaretaker) (members <$> records)
     caretakerDisplayNames <- traverse (fmap (^. displayName) . getUser apiToken) caretakerIDs
     return $ unlines $ formatLine <$> zip3 (name <$> records) caretakerDisplayNames caretakerIDs
@@ -66,15 +74,16 @@ listUsers :: Token -> ExceptT Text IO Text
 listUsers apiToken = unlines . fmap formatLine <$> listAllUsers apiToken
     where formatLine user = pack $ printf "%s: %s" (user ^. User.id) (user ^. displayName)
 
-ensureTeamState :: Token -> Team -> ExceptT Text IO ()
-ensureTeamState apiToken team = do
+ensureTeamState :: Token -> [Text] -> Team -> ExceptT Text IO ()
+ensureTeamState apiToken commonChannelIDs team = do
     channel <- findOrCreateChannel apiToken channelName userIDs
-    let channelID = channel ^. Channel.id
+    let channelID     = channel ^. Channel.id
+    let groupChannels = channelID : commonChannelIDs
     ensureAllMembersPresent apiToken channelID userIDs
     caretakerID <- lift $ getCaretaker userIDs
     ensureChannelTopic apiToken channel (Lib.topic team) caretakerID
-    ensureGroupState apiToken teamGroupHandle      teamGroupName      [channelID] userIDs
-    ensureGroupState apiToken caretakerGroupHandle caretakerGroupName [channelID] [caretakerID]
+    ensureGroupState apiToken teamGroupHandle      teamGroupName      groupChannels userIDs
+    ensureGroupState apiToken caretakerGroupHandle caretakerGroupName groupChannels [caretakerID]
   where
     channelName          = "tm-" <> name team
     teamGroupHandle      = name team <> "-team"

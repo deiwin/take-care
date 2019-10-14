@@ -103,7 +103,7 @@ The `ensure` command _ensures_ that
   - exist,
   - include the configured team members, and
   - have their topic set per configuration;
-- user groups `@design` and `@dev`
+- user groups `@design-team` and `@dev-team`
   - exist and
   - consist of the configured team members;
 - user groups `@design-caretaker` and `@dev-caretaker`

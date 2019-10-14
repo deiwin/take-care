@@ -74,9 +74,9 @@ ensureTeamState apiToken record = do
     ensureGroupState apiToken caretakerGroupHandle caretakerGroupName [channelID] [caretakerID]
   where
     channelName          = "tm-" <> team record
-    teamGroupHandle      = team record
-    teamGroupName        = "Team " <> teamGroupHandle
-    caretakerGroupHandle = teamGroupHandle <> "-caretaker"
+    teamGroupHandle      = (team record) <> "-team"
+    teamGroupName        = "Team " <> (team record)
+    caretakerGroupHandle = (team record) <> "-caretaker"
     caretakerGroupName   = teamGroupName <> " caretaker"
     userIDs              = members record
 

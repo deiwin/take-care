@@ -127,7 +127,13 @@ The `ensure` command _ensures_ that
 - Save the permission changes.
 - In the same **OAuth & Permissions** section, scroll to the top and click on
   the **Install App to Workspace** button and authorize the installation.
-- You will then see your **OAuth Access Token**. Copy it.
+- You will then see a **OAuth Access Token** and a **Bot User OAuth Access
+  Token**. The scopes above are configured separately for both. You can use
+  either token, but the bot token will only work if you've enabled
+  usergroup modifications for non-admins in your workspace. It is disabled
+  by default, but can be enabled from **Administration** -> **Settings
+  & Permissions** -> **Permissions** -> **User Groups**, or from
+  https://<your-domain>.slack.com/admin/settings#user_group_restrictions
 
 ## Installation
 

@@ -17,7 +17,7 @@ import Slack.Group as Group (getGroupMembers, setGroupMembers, setGroupChannels,
   , createGroup, id, channelIDs)
 import Slack.User as User (getUser, listAllUsers, id, displayName)
 import Dhall (input, auto, Interpret)
-import Data.Text (Text, unlines, pack, filter)
+import Data.Text (Text, unlines, pack, filter, intercalate)
 import Text.Printf (printf)
 import GHC.Generics (Generic)
 import Text.Show.Functions ()
@@ -30,7 +30,7 @@ import Control.Monad.Trans.Except (ExceptT)
 import Data.Time.Clock (getCurrentTime, UTCTime(..))
 import Data.Time.Calendar.WeekDate (toWeekDate)
 
-data Team = Team { members :: [Text]
+data Team = Team { members :: [[Text]]
                  , team :: Text -- TODO should be max 21 chars with the tm- prefix, so 18
                  , topic :: Text -> Text
                  } deriving (Generic, Show)
@@ -41,7 +41,7 @@ ensure :: Text -> Token -> ExceptT Text IO Text
 ensure inputText apiToken = do
     records      <- lift $ input auto inputText
     teamResults  <- traverse (wrapTeamResult $ ensureTeamState apiToken) records
-    caretakerIDs <- traverse (lift . getCaretaker) (members <$> records)
+    caretakerIDs <- traverse (lift . getCaretaker) $ concat (members <$> records)
     groupResult  <- wrapGroupResult <$> ensureGroupState apiToken groupHandle groupName groupChannels caretakerIDs
     return $ unlines (teamResults ++ [groupResult])
   where
@@ -54,7 +54,7 @@ ensure inputText apiToken = do
 listCaretakers :: Text -> Token -> ExceptT Text IO Text
 listCaretakers inputText apiToken = do
     records               <- lift $ input auto inputText
-    caretakerIDs          <- traverse (lift . getCaretaker) (members <$> records)
+    caretakerIDs          <- traverse (lift . getCaretaker) $ concat (members <$> records)
     caretakerDisplayNames <- traverse (fmap (^. displayName) . getUser apiToken) caretakerIDs
     return $ unlines $ formatLine <$> zip3 (team <$> records) caretakerDisplayNames caretakerIDs
     where formatLine (teamName, userName, userID) = pack $ printf "Team %s: %s (%s)" teamName userName userID
@@ -68,22 +68,22 @@ ensureTeamState apiToken record = do
     channel <- findOrCreateChannel apiToken channelName userIDs
     let channelID = channel ^. Channel.id
     ensureAllMembersPresent apiToken channelID userIDs
-    caretakerID <- lift $ getCaretaker userIDs
-    ensureChannelTopic apiToken channel (Lib.topic record) caretakerID
+    caretakerIDs <- traverse (lift . getCaretaker) (members record)
+    ensureChannelTopic apiToken channel (Lib.topic record) caretakerIDs
     ensureGroupState apiToken teamGroupHandle      teamGroupName      [channelID] userIDs
-    ensureGroupState apiToken caretakerGroupHandle caretakerGroupName [channelID] [caretakerID]
+    ensureGroupState apiToken caretakerGroupHandle caretakerGroupName [channelID] caretakerIDs
   where
     channelName          = "tm-" <> team record
     teamGroupHandle      = (team record) <> "-team"
     teamGroupName        = "Team " <> (team record)
     caretakerGroupHandle = (team record) <> "-caretaker"
     caretakerGroupName   = teamGroupName <> " caretaker"
-    userIDs              = members record
+    userIDs              = concat $ members record
 
-ensureChannelTopic :: Token -> Channel -> (Text -> Text) -> Text -> ExceptT Text IO ()
-ensureChannelTopic apiToken channel buildTopic caretakerID = do
-    caretakerDisplayName <- (^. displayName) <$> getUser apiToken caretakerID
-    let newTopic = buildTopic caretakerDisplayName
+ensureChannelTopic :: Token -> Channel -> (Text -> Text) -> [Text] -> ExceptT Text IO ()
+ensureChannelTopic apiToken channel buildTopic caretakerIDs = do
+    caretakerDisplayNames <- traverse (fmap (^. displayName) . getUser apiToken) caretakerIDs
+    let newTopic = buildTopic $ intercalate ", " caretakerDisplayNames
     unless (same currentTopic newTopic) $ setChannelTopic apiToken channelID newTopic
   where
     channelID    = channel ^. Channel.id

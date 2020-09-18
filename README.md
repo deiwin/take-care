@@ -60,9 +60,10 @@ according to your needs. The configuration is written in [Dhall][3],
 a programmable configuration language with Haskell-like syntax.
 
 ```haskell
-[ { members = [ "U111ALICE" -- Alice
-              , "U22222BOB" -- Bob
-              , "U55555EVE" -- Eve
+[ { members = [[ "U111ALICE" -- Alice
+               , "U22222BOB" -- Bob
+               , "U55555EVE" -- Eve
+               ]
               ]
   , team = "design"
   , topic = \(caretaker : Text) ->
@@ -71,11 +72,15 @@ a programmable configuration language with Haskell-like syntax.
     in let separator = ":paw_prints:"
     in "${standup} ${separator} ${board} ${separator} Caretaker ${caretaker}"
   }
-, { members = [ "U333CAROL" -- Carol
-              , "U4444DAVE" -- Dave
+, { members = [[ "U333CAROL" -- Carol
+               , "U4444DAVE" -- Dave
+               ]
+              ,[ "U22222BOB" -- Bob
+               , "U111ALICE" -- Alice
+               ]
               ]
   , team = "dev"
-  , topic = \(caretaker : Text) -> "${caretaker} is the caretaker"
+  , topic = \(caretakers : Text) -> "${caretakers} are the caretakers"
   }
 ]
 ```

@@ -53,10 +53,11 @@ ensure inputText apiToken = do
 
 listCaretakers :: Text -> Token -> ExceptT Text IO Text
 listCaretakers inputText apiToken = do
-    records               <- lift $ input auto inputText
+    records :: [Team]     <- lift $ input auto inputText
+    let teams              = concat ((\r -> const (team r) <$> members r) <$> records)
     caretakerIDs          <- traverse (lift . getCaretaker) $ concat (members <$> records)
     caretakerDisplayNames <- traverse (fmap (^. displayName) . getUser apiToken) caretakerIDs
-    return $ unlines $ formatLine <$> zip3 (team <$> records) caretakerDisplayNames caretakerIDs
+    return $ unlines $ formatLine <$> zip3 teams caretakerDisplayNames caretakerIDs
     where formatLine (teamName, userName, userID) = pack $ printf "Team %s: %s (%s)" teamName userName userID
 
 listUsers :: Token -> ExceptT Text IO Text

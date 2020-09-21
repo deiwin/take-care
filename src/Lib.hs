@@ -24,7 +24,7 @@ import Text.Show.Functions ()
 import Data.Traversable (traverse)
 import Control.Monad (unless)
 import Control.Lens ((^.))
-import Data.List (null, (\\), cycle, zip3, elem)
+import Data.List (null, (\\), cycle, zip3, elem, nub)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (ExceptT)
 import Data.Time.Clock (getCurrentTime, UTCTime(..))
@@ -41,7 +41,7 @@ ensure :: Text -> Token -> ExceptT Text IO Text
 ensure inputText apiToken = do
     records      <- lift $ input auto inputText
     teamResults  <- traverse (wrapTeamResult $ ensureTeamState apiToken) records
-    caretakerIDs <- traverse (lift . getCaretaker) $ concat (members <$> records)
+    caretakerIDs <- fmap nub $ traverse (lift . getCaretaker) $ concat (members <$> records)
     groupResult  <- wrapGroupResult <$> ensureGroupState apiToken groupHandle groupName groupChannels caretakerIDs
     return $ unlines (teamResults ++ [groupResult])
   where
@@ -69,7 +69,7 @@ ensureTeamState apiToken record = do
     channel <- findOrCreateChannel apiToken channelName userIDs
     let channelID = channel ^. Channel.id
     ensureAllMembersPresent apiToken channelID userIDs
-    caretakerIDs <- traverse (lift . getCaretaker) (members record)
+    caretakerIDs <- fmap nub $ traverse (lift . getCaretaker) $ members record
     ensureChannelTopic apiToken channel (Lib.topic record) caretakerIDs
     ensureGroupState apiToken teamGroupHandle      teamGroupName      [channelID] userIDs
     ensureGroupState apiToken caretakerGroupHandle caretakerGroupName [channelID] caretakerIDs
@@ -79,7 +79,7 @@ ensureTeamState apiToken record = do
     teamGroupName        = "Team " <> team record
     caretakerGroupHandle = team record <> "-caretaker"
     caretakerGroupName   = teamGroupName <> " caretaker"
-    userIDs              = concat $ members record
+    userIDs              = nub $ concat $ members record
 
 ensureChannelTopic :: Token -> Channel -> (Text -> Text) -> [Text] -> ExceptT Text IO ()
 ensureChannelTopic apiToken channel buildTopic caretakerIDs = do

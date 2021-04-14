@@ -73,8 +73,8 @@ findGroup apiToken expectedHandle = do
     respBody <- slackGet apiToken opts "usergroups.list"
     groups   <-
         traverse fromJSON
-        =<< (^.. values)
-        <$> ((respBody ^? key "usergroups") ?? "\"users.list\" response didn't include a \"channels\" field")
+        .   (^.. values)
+        =<< ((respBody ^? key "usergroups") ?? "\"users.list\" response didn't include a \"channels\" field")
     return $ find (\x -> (x ^. handle) == expectedHandle) groups
 
 createGroup :: Token -> Text -> Text -> [Text] -> ExceptT Text IO Group

@@ -49,8 +49,8 @@ findChannel apiToken expectedName = do
     respBodies <- slackGetPaginated apiToken defaults "conversations.list"
     channels   <-
         traverse fromJSON
-        =<< concatMap (^.. values)
-        <$> (traverse (^? key "channels") respBodies ?? "\"users.list\" response didn't include a \"channels\" field")
+        .   concatMap (^.. values)
+        =<< (traverse (^? key "channels") respBodies ?? "\"users.list\" response didn't include a \"channels\" field")
     return $ find (\x -> (x ^. name) == expectedName) channels
 
 createChannel :: Token -> Text -> [Text] -> ExceptT Text IO Channel

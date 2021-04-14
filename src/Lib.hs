@@ -49,7 +49,7 @@ ensure inputText apiToken = do
     groupResult  <- wrapGroupResult <$> ensureGroupState apiToken groupHandle groupName groupChannels caretakerIDs
     return $ unlines (teamResults ++ [groupResult])
   where
-    wrapTeamResult f record = const ("Team " <> team record <> ": success!") <$> f record
+    wrapTeamResult f record = ("Team " <> team record <> ": success!") <$ f record
     wrapGroupResult = const "Caretakers group: success!"
     groupHandle     = "caretakers"
     groupName       = "Current caretakers of every team"
@@ -58,7 +58,7 @@ ensure inputText apiToken = do
 listCaretakers :: Text -> Token -> ExceptT Text IO Text
 listCaretakers inputText apiToken = do
     records :: [Team]     <- lift $ input auto inputText
-    let teams              = concat ((\r -> const (team r) <$> (caretakers . members) r) <$> records)
+    let teams              = concat ((\r -> team r <$ (caretakers . members) r) <$> records)
     caretakerIDs          <- traverse (lift . getCaretaker) $ concat (caretakers . members <$> records)
     caretakerDisplayNames <- traverse (fmap (^. displayName) . getUser apiToken) caretakerIDs
     return $ unlines $ formatLine <$> zip3 teams caretakerDisplayNames caretakerIDs

@@ -16,7 +16,7 @@ import Slack.Channel as Channel (findChannel, createChannel, inviteMembers, getC
 import Slack.Group as Group (getGroupMembers, setGroupMembers, setGroupChannels, findGroup
   , createGroup, id, channelIDs)
 import Slack.User as User (getUser, listAllUsers, id, displayName)
-import Dhall (input, auto, Interpret)
+import Dhall (input, auto, FromDhall)
 import Data.Text (Text, unlines, pack, filter, intercalate)
 import Text.Printf (printf)
 import GHC.Generics (Generic)
@@ -33,13 +33,13 @@ import Data.Time.Calendar.WeekDate (toWeekDate)
 data Members = Members { caretakers :: [[Text]]
                        , others :: [Text]
                        } deriving (Generic, Show)
-instance Interpret Members
+instance FromDhall Members
 
 data Team = Team { members :: Members
                  , team :: Text -- TODO should be max 21 chars with the tm- prefix, so 18
                  , topic :: Text -> Text
                  } deriving (Generic, Show)
-instance Interpret Team
+instance FromDhall Team
 
 ensure :: Text -> Token -> ExceptT Text IO Text
 ensure inputText apiToken = do

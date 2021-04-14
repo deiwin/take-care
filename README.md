@@ -52,6 +52,7 @@ U22222BOB: @bob
 U333CAROL: @carol
 U4444DAVE: @dave
 U55555EVE: @eve
+U6666FAYE: @faye
 ```
 
 With the list of user IDs at hand, you're ready to create the configuration for
@@ -65,6 +66,8 @@ a programmable configuration language with Haskell-like syntax.
                               , "U55555EVE" -- Eve
                               ]
                              ]
+              , others = [ "U6666FAYE" -- Faye
+                         ]
               }
   , team = "design"
   , topic = \(caretaker : Text) ->
@@ -80,6 +83,7 @@ a programmable configuration language with Haskell-like syntax.
                               , "U111ALICE" -- Alice
                               ]
                              ]
+              , others = [] : List Text
               }
   , team = "dev"
   , topic = \(caretakers : Text) -> "${caretakers} are the caretakers"

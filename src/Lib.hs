@@ -31,6 +31,7 @@ import Data.Time.Clock (getCurrentTime, UTCTime(..))
 import Data.Time.Calendar.WeekDate (toWeekDate)
 
 data Members = Members { caretakers :: [[Text]]
+                       , others :: [Text]
                        } deriving (Generic, Show)
 instance Interpret Members
 
@@ -69,12 +70,12 @@ listUsers apiToken = unlines . fmap formatLine <$> listAllUsers apiToken
 
 ensureTeamState :: Token -> Team -> ExceptT Text IO ()
 ensureTeamState apiToken record = do
-    channel <- findOrCreateChannel apiToken channelName userIDs
+    channel <- findOrCreateChannel apiToken channelName allUserIDs
     let channelID = channel ^. Channel.id
-    ensureAllMembersPresent apiToken channelID userIDs
+    ensureAllMembersPresent apiToken channelID allUserIDs
     caretakerIDs <- fmap nub $ traverse (lift . getCaretaker) $ caretakers $ members record
     ensureChannelTopic apiToken channel (Lib.topic record) caretakerIDs
-    ensureGroupState apiToken teamGroupHandle      teamGroupName      [channelID] userIDs
+    ensureGroupState apiToken teamGroupHandle      teamGroupName      [channelID] allUserIDs
     ensureGroupState apiToken caretakerGroupHandle caretakerGroupName [channelID] caretakerIDs
   where
     channelName          = "tm-" <> team record
@@ -82,7 +83,9 @@ ensureTeamState apiToken record = do
     teamGroupName        = "Team " <> team record
     caretakerGroupHandle = team record <> "-caretaker"
     caretakerGroupName   = teamGroupName <> " caretaker"
-    userIDs              = nub $ concat $ caretakers $ members record
+    allCaretakerIDs      = concat $ caretakers $ members record
+    othersIDs            = others $ members record
+    allUserIDs           = nub (allCaretakerIDs ++ othersIDs)
 
 ensureChannelTopic :: Token -> Channel -> (Text -> Text) -> [Text] -> ExceptT Text IO ()
 ensureChannelTopic apiToken channel buildTopic caretakerIDs = do

@@ -1,4 +1,4 @@
-FROM fpco/stack-build:lts-17.9 as builder
+FROM fpco/stack-build:lts-17.8 as builder
 
 ADD stack.yaml package.yaml ./
 RUN stack -j "$(nproc)" --system-ghc build --only-dependencies

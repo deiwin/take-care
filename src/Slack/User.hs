@@ -15,14 +15,15 @@ where
 
 import Prelude hiding (id)
 import Slack.Util (slackGet, slackGetPaginated, fromJSON, Token)
-import Data.Text (Text)
+import Data.Text as T (Text, null)
 import Data.Traversable (traverse)
 import Network.Wreq (defaults, param)
 import Control.Lens ((&), (.~), (^?), (^..))
 import Control.Lens.TH (makeLenses)
 import GHC.Generics (Generic)
-import Data.Aeson (FromJSON(parseJSON), withObject, (.:))
+import Data.Aeson (FromJSON(parseJSON), withObject, (.:), (.:?))
 import Data.Aeson.Lens (key, values)
+import Data.Maybe (Maybe(..), fromMaybe)
 import Control.Monad.Trans.Except (ExceptT)
 import Control.Error.Util ((??))
 
@@ -34,8 +35,13 @@ $(makeLenses ''User)
 instance FromJSON User where
     parseJSON = withObject "User" $ \o -> do
         _id <- o .: "id"
+        name <- o .: "name"
+
         profile <- o .: "profile"
-        _displayName <- ("@" <>) <$> (profile .: "display_name")
+        displayName <- profile .:? "display_name"
+        let nonEmptyDisplayName = displayName >>= (\x -> if T.null x then Nothing else Just x)
+
+        let _displayName = "@" <> fromMaybe name nonEmptyDisplayName
         return User{..}
 
 getUser :: Token -> Text -> ExceptT Text IO User

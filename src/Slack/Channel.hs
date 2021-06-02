@@ -17,7 +17,7 @@ module Slack.Channel
 where
 
 import Prelude hiding (id)
-import Slack.Util (slackGetPaginated, slackPost, Token, fromJSON)
+import Slack.Util (slackGetPaginated, slackPost, NetCtx, fromJSON)
 import Data.Text (Text, unpack)
 import Data.Traversable (traverse)
 import Network.Wreq (defaults, param)
@@ -44,44 +44,44 @@ instance FromJSON Channel where
         _topic <- topicObject .: "value"
         return Channel{..}
 
-findChannel :: Token -> Text -> ExceptT Text IO (Maybe Channel)
-findChannel apiToken expectedName = do
+findChannel :: NetCtx -> Text -> ExceptT Text IO (Maybe Channel)
+findChannel netCtx expectedName = do
     let params = defaults & param "types" .~ [ "public_channel,private_channel" ]
                           & param "exclude_archived" .~ [ "true" ]
-    respBodies <- slackGetPaginated apiToken params "conversations.list"
+    respBodies <- slackGetPaginated netCtx params "conversations.list"
     channels   <-
         traverse fromJSON
         .   concatMap (^.. values)
         =<< (traverse (^? key "channels") respBodies ?? "\"users.list\" response didn't include a \"channels\" field")
     return $ find (\x -> (x ^. name) == expectedName) channels
 
-createChannel :: Token -> Text -> [Text] -> ExceptT Text IO Channel
-createChannel apiToken newName userIDs = do
+createChannel :: NetCtx -> Text -> [Text] -> ExceptT Text IO Channel
+createChannel netCtx newName userIDs = do
     let params = [ "name" .= newName
                  , "user_ids" .= intercalate "," (unpack <$> userIDs)
                  ]
-    respBody <- slackPost apiToken params "conversations.create"
+    respBody <- slackPost netCtx params "conversations.create"
     val      <- (respBody ^? key "channel") ?? "\"conversations.create\" response didn't include a \"channel\" key"
     fromJSON val
 
-inviteMembers :: Token -> Text -> [Text] -> ExceptT Text IO ()
-inviteMembers apiToken channelID userIDs = do
+inviteMembers :: NetCtx -> Text -> [Text] -> ExceptT Text IO ()
+inviteMembers netCtx channelID userIDs = do
     let params = [ "channel" .= channelID
                  , "users" .= intercalate "," (unpack <$> userIDs)
                  ]
-    _ <- slackPost apiToken params "conversations.invite"
+    _ <- slackPost netCtx params "conversations.invite"
     return ()
 
-getChannelMembers :: Token -> Text -> ExceptT Text IO [Text]
-getChannelMembers apiToken channelID = do
+getChannelMembers :: NetCtx -> Text -> ExceptT Text IO [Text]
+getChannelMembers netCtx channelID = do
     let opts = defaults & param "channel" .~ [channelID]
-    respBodies <- slackGetPaginated apiToken opts "conversations.members"
+    respBodies <- slackGetPaginated netCtx opts "conversations.members"
     return $ respBodies ^.. traverse . key "members" . values . _String
 
-setChannelTopic :: Token -> Text -> Text -> ExceptT Text IO ()
-setChannelTopic apiToken channelID newTopic = do
+setChannelTopic :: NetCtx -> Text -> Text -> ExceptT Text IO ()
+setChannelTopic netCtx channelID newTopic = do
     let params = [ "channel" .= channelID
                  , "topic" .= newTopic
                  ]
-    _ <- slackPost apiToken params "conversations.setTopic"
+    _ <- slackPost netCtx params "conversations.setTopic"
     return ()

@@ -18,7 +18,7 @@ module Slack.Group
 where
 
 import Prelude hiding (id)
-import Slack.Util (slackGet, slackPost, Token, fromJSON)
+import Slack.Util (slackGet, slackPost, NetCtx, fromJSON)
 import Data.Text (Text, unpack)
 import Network.Wreq (defaults, param)
 import Control.Lens ((&), (.~), (^?), (^.), (^..))
@@ -44,45 +44,45 @@ instance FromJSON Group where
         _channelIDs <- prefs .: "channels"
         return Group{..}
 
-getGroupMembers :: Token -> Text -> ExceptT Text IO [Text]
-getGroupMembers apiToken groupID = do
+getGroupMembers :: NetCtx -> Text -> ExceptT Text IO [Text]
+getGroupMembers netCtx groupID = do
     let opts = defaults & param "usergroup" .~ [groupID]
                         & param "include_disabled" .~ ["true"]
-    respBody <- slackGet apiToken opts "usergroups.users.list"
+    respBody <- slackGet netCtx opts "usergroups.users.list"
     return $ respBody ^.. key "users" . values . _String
 
-setGroupMembers :: Token -> Text -> [Text] -> ExceptT Text IO ()
-setGroupMembers apiToken groupID userIDs = do
+setGroupMembers :: NetCtx -> Text -> [Text] -> ExceptT Text IO ()
+setGroupMembers netCtx groupID userIDs = do
     let params = [ "usergroup" .= groupID
                  , "users" .= intercalate "," (unpack <$> userIDs)
                  ]
-    _ <- slackPost apiToken params "usergroups.users.update"
+    _ <- slackPost netCtx params "usergroups.users.update"
     return ()
 
-setGroupChannels :: Token -> Text -> [Text] -> ExceptT Text IO ()
-setGroupChannels apiToken groupID defaultChannelIDs = do
+setGroupChannels :: NetCtx -> Text -> [Text] -> ExceptT Text IO ()
+setGroupChannels netCtx groupID defaultChannelIDs = do
     let params = [ "usergroup" .= groupID
                  , "channels" .= intercalate "," (unpack <$> defaultChannelIDs)
                  ]
-    _ <- slackPost apiToken params "usergroups.update"
+    _ <- slackPost netCtx params "usergroups.update"
     return ()
 
-findGroup :: Token -> Text -> ExceptT Text IO (Maybe Group)
-findGroup apiToken expectedHandle = do
+findGroup :: NetCtx -> Text -> ExceptT Text IO (Maybe Group)
+findGroup netCtx expectedHandle = do
     let opts = defaults & param "include_disabled" .~ ["true"]
-    respBody <- slackGet apiToken opts "usergroups.list"
+    respBody <- slackGet netCtx opts "usergroups.list"
     groups   <-
         traverse fromJSON
         .   (^.. values)
         =<< ((respBody ^? key "usergroups") ?? "\"users.list\" response didn't include a \"channels\" field")
     return $ find (\x -> (x ^. handle) == expectedHandle) groups
 
-createGroup :: Token -> Text -> Text -> [Text] -> ExceptT Text IO Group
-createGroup apiToken groupHandle groupName defaultChannelIDs = do
+createGroup :: NetCtx -> Text -> Text -> [Text] -> ExceptT Text IO Group
+createGroup netCtx groupHandle groupName defaultChannelIDs = do
     let params = [ "handle" .= groupHandle
                  , "name" .= groupName
                  , "channels" .= intercalate "," (unpack <$> defaultChannelIDs)
                  ]
-    respBody <- slackPost apiToken params "usergroups.create"
+    respBody <- slackPost netCtx params "usergroups.create"
     val      <- (respBody ^? key "usergroup") ?? "\"usergroups.create\" response didn't include a \"usergroup\" key"
     fromJSON val

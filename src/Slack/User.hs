@@ -14,7 +14,7 @@ module Slack.User
 where
 
 import Prelude hiding (id)
-import Slack.Util (slackGet, slackGetPaginated, fromJSON, Token)
+import Slack.Util (slackGet, slackGetPaginated, fromJSON, NetCtx)
 import Data.Text as T (Text, null)
 import Data.Traversable (traverse)
 import Network.Wreq (defaults, param)
@@ -44,16 +44,16 @@ instance FromJSON User where
         let _displayName = "@" <> fromMaybe name nonEmptyDisplayName
         return User{..}
 
-getUser :: Token -> Text -> ExceptT Text IO User
-getUser apiToken userID = do
+getUser :: NetCtx -> Text -> ExceptT Text IO User
+getUser netCtx userID = do
     let opts = defaults & param "user" .~ [userID]
-    respBody <- slackGet apiToken opts "users.info"
+    respBody <- slackGet netCtx opts "users.info"
     val      <- (respBody ^? key "user") ?? "\"users.info\" response didn't include a \"user\" field"
     fromJSON val
 
-listAllUsers :: Token -> ExceptT Text IO [User]
-listAllUsers apiToken = do
-    respBodies <- slackGetPaginated apiToken defaults "users.list"
+listAllUsers :: NetCtx -> ExceptT Text IO [User]
+listAllUsers netCtx = do
+    respBodies <- slackGetPaginated netCtx defaults "users.list"
     vals       <-
         concatMap (^.. values)
             <$> (traverse (^? key "members") respBodies ?? "\"users.list\" response didn't include a \"members\" field")

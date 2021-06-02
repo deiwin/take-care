@@ -48,6 +48,7 @@ findChannel :: NetCtx -> Text -> ExceptT Text IO (Maybe Channel)
 findChannel netCtx expectedName = do
     let params = defaults & param "types" .~ [ "public_channel,private_channel" ]
                           & param "exclude_archived" .~ [ "true" ]
+                          & param "limit" .~ [ "1000" ]
     respBodies <- slackGetPaginated netCtx params "conversations.list"
     channels   <-
         traverse fromJSON

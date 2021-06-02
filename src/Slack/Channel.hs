@@ -46,7 +46,8 @@ instance FromJSON Channel where
 
 findChannel :: Token -> Text -> ExceptT Text IO (Maybe Channel)
 findChannel apiToken expectedName = do
-    respBodies <- slackGetPaginated apiToken defaults "conversations.list"
+    let params = defaults & param "types" .~ [ "public_channel,private_channel" ]
+    respBodies <- slackGetPaginated apiToken params "conversations.list"
     channels   <-
         traverse fromJSON
         .   concatMap (^.. values)

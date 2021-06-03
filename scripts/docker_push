@@ -1,7 +1,8 @@
 #!/bin/bash
-set -eu
+set -euo pipefail
 
-echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null && pwd)"
+"$DIR/docker_auth"
 
 image="deiwin/take-care"
 

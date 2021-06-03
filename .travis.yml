@@ -2,10 +2,10 @@ sudo: required
 services:
 - docker
 script:
-- travis_wait 40 docker build -t deiwin/take-care .
+- bash scripts/docker_auth && travis_wait 40 docker build -t deiwin/take-care .
 deploy:
   provider: script
-  script: bash .docker_push
+  script: bash scripts/docker_push
   on:
     branch: master
 env:

@@ -4,7 +4,13 @@ ADD stack.yaml package.yaml ./
 RUN stack -j "$(nproc)" --system-ghc build --only-dependencies
 
 ADD ./ ./
-RUN stack -j "$(nproc)" --system-ghc build --test --keep-going --copy-bins
+RUN stack -j "$(nproc)" --system-ghc build --copy-bins
+
+FROM builder as test
+
+RUN stack test
+ && stack install ormolu
+ && ormolu --mode check $(find src app test -name '*.hs')
 
 FROM debian:10.9
 

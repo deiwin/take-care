@@ -105,7 +105,6 @@ And finally, run the `ensure` command.
 $ docker run --rm -i -e "API_TOKEN=$API_TOKEN" deiwin/take-care:latest ensure < teams.dhall
 Team design: success!
 Team dev: success!
-Caretakers group: success!
 ```
 
 The `ensure` command _ensures_ that
@@ -116,13 +115,10 @@ The `ensure` command _ensures_ that
   - have their topic set per configuration;
 - user groups `@design-team` and `@dev-team`
   - exist and
-  - consist of the configured team members;
+  - consist of the configured team members; and
 - user groups `@design-caretaker` and `@dev-caretaker`
   - exist and
-  - consist of the current caretakers (one per team); and
-- user group `@caretakers`
-  - exists and
-  - consists of all current caretakers across different teams.
+  - consist of the current caretakers (one per team).
 
 ## Getting a Slack API token
 

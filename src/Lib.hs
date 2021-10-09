@@ -70,15 +70,9 @@ ensure inputText apiToken = do
   let netCtx = NetCtx apiToken sess
   records <- lift $ input auto inputText
   teamResults <- traverse (wrapTeamResult $ ensureTeamState netCtx) records
-  caretakerIDs <- fmap nub $ traverse (lift . getCaretaker) $ concat (caretakers . members <$> records)
-  groupResult <- wrapGroupResult <$> ensureGroupState netCtx groupHandle groupName groupChannels caretakerIDs
-  return $ unlines (teamResults ++ [groupResult])
+  return $ unlines teamResults
   where
     wrapTeamResult f record = ("Team " <> team record <> ": success!") <$ f record
-    wrapGroupResult = const "Caretakers group: success!"
-    groupHandle = "caretakers"
-    groupName = "Current caretakers of every team"
-    groupChannels = []
 
 listCaretakers :: Text -> ByteString -> ExceptT Text IO Text
 listCaretakers inputText apiToken = do

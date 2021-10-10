@@ -1,14 +1,16 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Config
   ( Members (..),
     Team (..),
     Group (..),
+    DesiredTeamState (..),
     parseTeamList,
     currentGroups,
-    currentGroupsForTeam,
+    currentDesiredTeamState,
   )
 where
 
@@ -46,6 +48,11 @@ data Group = Group
   }
   deriving (Show, Eq)
 
+data DesiredTeamState = DesiredTeamState
+  { groupList :: [Group],
+    topicGivenDisplayNames :: forall m. (Monad m) => (Text -> m Text) -> m Text
+  }
+
 parseTeamList :: Text -> IO [Team]
 parseTeamList = Dhall.input Dhall.auto
 
@@ -53,17 +60,25 @@ parseTeam :: Text -> IO Team
 parseTeam = Dhall.input Dhall.auto
 
 currentGroups :: UTCTime -> [Team] -> [Group]
-currentGroups time teams = concat $ currentGroupsForTeam time <$> teams
+currentGroups time teams = concat (groupList . currentDesiredTeamState time <$> teams)
 
-currentGroupsForTeam :: UTCTime -> Team -> [Group]
-currentGroupsForTeam time team = [caretakers, everyone]
+currentDesiredTeamState :: UTCTime -> Team -> DesiredTeamState
+currentDesiredTeamState time team =
+  DesiredTeamState
+    { groupList = [caretakers, everyone],
+      topicGivenDisplayNames =
+        \getDisplayName -> do
+          displayNameList <- traverse getDisplayName $ Set.toList caretakerIDs
+          return $ topic team $ intercalate ", " displayNameList
+    }
   where
     caretakers =
       Group
         { handle = teamName <> "-caretaker",
           description = "Team " <> teamName <> " caretaker(s)",
-          memberIDs = Set.fromList $ currentCaretakerList time team
+          memberIDs = caretakerIDs
         }
+    caretakerIDs = Set.fromList $ currentCaretakerList time team
     everyone =
       Group
         { handle = teamName <> "-team",

@@ -8,7 +8,7 @@ module Lib
   )
 where
 
-import Config (Group (..), Members (..), Team (..), currentGroupsForTeam, parseTeamList)
+import Config (DesiredTeamState (..), Group (..), Members (..), Team (..), currentDesiredTeamState, parseTeamList)
 import Control.Lens ((^.))
 import Control.Monad (unless)
 import Control.Monad.Trans.Class (lift)
@@ -79,17 +79,16 @@ ensureTeamState :: NetCtx -> Team -> ExceptT Text IO ()
 ensureTeamState netCtx record = do
   channel <- findOrCreateChannel netCtx channelName
   let channelID = channel ^. Channel.id
-  caretakerIDs <- fmap nub $ traverse (lift . getCaretaker) $ caretakers $ members record
-  ensureChannelTopic netCtx channel (Config.topic record) caretakerIDs
   time <- lift getCurrentTime
-  traverse_ (ensureGroupState netCtx [channelID]) $ currentGroupsForTeam time record
+  let desiredTeamState = currentDesiredTeamState time record
+  ensureChannelTopic netCtx channel desiredTeamState
+  traverse_ (ensureGroupState netCtx [channelID]) $ groupList desiredTeamState
   where
     channelName = "tm-" <> team record
 
-ensureChannelTopic :: NetCtx -> Channel -> (Text -> Text) -> [Text] -> ExceptT Text IO ()
-ensureChannelTopic netCtx channel buildTopic caretakerIDs = do
-  caretakerDisplayNames <- traverse (fmap (^. displayName) . getUser netCtx) caretakerIDs
-  let newTopic = buildTopic $ intercalate ", " caretakerDisplayNames
+ensureChannelTopic :: NetCtx -> Channel -> DesiredTeamState -> ExceptT Text IO ()
+ensureChannelTopic netCtx channel desiredTeamState = do
+  newTopic <- topicGivenDisplayNames desiredTeamState (fmap (^. displayName) . getUser netCtx)
   unless (same currentTopic newTopic) $ setChannelTopic netCtx channelID newTopic
   where
     channelID = channel ^. Channel.id

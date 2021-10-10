@@ -7,8 +7,6 @@
 module Slack.Channel
   ( findChannel,
     createChannel,
-    inviteMembers,
-    getChannelMembers,
     setChannelTopic,
     Channel,
     id,
@@ -60,30 +58,12 @@ findChannel netCtx expectedName = do
       =<< (traverse (^? key "channels") respBodies ?? "\"users.list\" response didn't include a \"channels\" field")
   return $ find (\x -> (x ^. name) == expectedName) channels
 
-createChannel :: NetCtx -> Text -> [Text] -> ExceptT Text IO Channel
-createChannel netCtx newName userIDs = do
-  let params =
-        [ "name" .= newName,
-          "user_ids" .= intercalate "," (unpack <$> userIDs)
-        ]
+createChannel :: NetCtx -> Text -> ExceptT Text IO Channel
+createChannel netCtx newName = do
+  let params = ["name" .= newName]
   respBody <- slackPost netCtx params "conversations.create"
   val <- (respBody ^? key "channel") ?? "\"conversations.create\" response didn't include a \"channel\" key"
   fromJSON val
-
-inviteMembers :: NetCtx -> Text -> [Text] -> ExceptT Text IO ()
-inviteMembers netCtx channelID userIDs = do
-  let params =
-        [ "channel" .= channelID,
-          "users" .= intercalate "," (unpack <$> userIDs)
-        ]
-  _ <- slackPost netCtx params "conversations.invite"
-  return ()
-
-getChannelMembers :: NetCtx -> Text -> ExceptT Text IO [Text]
-getChannelMembers netCtx channelID = do
-  let opts = defaults & param "channel" .~ [channelID]
-  respBodies <- slackGetPaginated netCtx opts "conversations.members"
-  return $ respBodies ^.. traverse . key "members" . values . _String
 
 setChannelTopic :: NetCtx -> Text -> Text -> ExceptT Text IO ()
 setChannelTopic netCtx channelID newTopic = do

@@ -26,9 +26,7 @@ import Slack.Channel as Channel
   ( Channel,
     createChannel,
     findChannel,
-    getChannelMembers,
     id,
-    inviteMembers,
     setChannelTopic,
     topic,
   )
@@ -96,9 +94,8 @@ listUsers apiToken = do
 
 ensureTeamState :: NetCtx -> Team -> ExceptT Text IO ()
 ensureTeamState netCtx record = do
-  channel <- findOrCreateChannel netCtx channelName allUserIDs
+  channel <- findOrCreateChannel netCtx channelName
   let channelID = channel ^. Channel.id
-  ensureAllMembersPresent netCtx channelID allUserIDs
   caretakerIDs <- fmap nub $ traverse (lift . getCaretaker) $ caretakers $ members record
   ensureChannelTopic netCtx channel (Lib.topic record) caretakerIDs
   ensureGroupState netCtx teamGroupHandle teamGroupName [channelID] allUserIDs
@@ -130,10 +127,10 @@ getCaretaker userIDs = do
   (_, currentUtcWeek, _) <- toWeekDate . utctDay <$> getCurrentTime
   return $ cycle userIDs !! currentUtcWeek
 
-findOrCreateChannel :: NetCtx -> Text -> [Text] -> ExceptT Text IO Channel
-findOrCreateChannel netCtx name userIDs = do
+findOrCreateChannel :: NetCtx -> Text -> ExceptT Text IO Channel
+findOrCreateChannel netCtx name = do
   current <- findChannel netCtx name
-  maybe (createChannel netCtx name userIDs) return current
+  maybe (createChannel netCtx name) return current
 
 ensureGroupState :: NetCtx -> Text -> Text -> [Text] -> [Text] -> ExceptT Text IO ()
 ensureGroupState netCtx groupHandle groupName defaultChannelIDs userIDs = do
@@ -149,9 +146,3 @@ ensureGroupState netCtx groupHandle groupName defaultChannelIDs userIDs = do
   where
     createNew = createGroup netCtx groupHandle groupName defaultChannelIDs
     same a b = null (a \\ b) && null (b \\ a)
-
-ensureAllMembersPresent :: NetCtx -> Text -> [Text] -> ExceptT Text IO ()
-ensureAllMembersPresent netCtx channelID userIDs = do
-  currentMembers <- getChannelMembers netCtx channelID
-  let missingMembers = userIDs \\ currentMembers
-  unless (null missingMembers) $ inviteMembers netCtx channelID missingMembers

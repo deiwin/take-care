@@ -53,6 +53,8 @@ U333CAROL: @carol
 U4444DAVE: @dave
 U55555EVE: @eve
 U6666FAYE: @faye
+U77777GIL: @gil
+U88888HAL: @hal
 ```
 
 With the list of user IDs at hand, you're ready to create the configuration for
@@ -63,10 +65,10 @@ a programmable configuration language with Haskell-like syntax.
 ```haskell
 [ { members = { caretakers = [[ "U111ALICE" -- Alice
                               , "U22222BOB" -- Bob
-                              , "U55555EVE" -- Eve
+                              , "U333CAROL" -- Carol
                               ]
                              ]
-              , others = [ "U6666FAYE" -- Faye
+              , others = [ "U4444DAVE" -- Dave
                          ]
               }
   , team = "design"
@@ -76,11 +78,11 @@ a programmable configuration language with Haskell-like syntax.
     in let separator = ":paw_prints:"
     in "${standup} ${separator} ${board} ${separator} Caretaker ${caretaker}"
   }
-, { members = { caretakers = [[ "U333CAROL" -- Carol
-                              , "U4444DAVE" -- Dave
+, { members = { caretakers = [[ "U55555EVE" -- Eve
+                              , "U6666FAYE" -- Faye
                               ]
-                             ,[ "U22222BOB" -- Bob
-                              , "U111ALICE" -- Alice
+                             ,[ "U77777GIL" -- Gil
+                              , "U88888HAL" -- Hal
                               ]
                              ]
               , others = [] : List Text
@@ -96,7 +98,8 @@ Verify the configuration with the `list-caretakers` command.
 ```
 $ docker run --rm -i -e "API_TOKEN=$API_TOKEN" deiwin/take-care:latest list-caretakers < teams.dhall
 Team design: @bob (U22222BOB)
-Team dev: @carol (U333CAROL)
+Team dev: @eve (U55555EVE)
+Team dev: @gil (U77777GIL)
 ```
 
 And finally, run the `ensure` command.
@@ -118,7 +121,7 @@ The `ensure` command _ensures_ that
   - consist of the configured team members; and
 - user groups `@design-caretaker` and `@dev-caretaker`
   - exist and
-  - consist of the current caretakers (one per team).
+  - consist of the current caretakers (one per caretaker list per team).
 
 ## Getting a Slack API token
 

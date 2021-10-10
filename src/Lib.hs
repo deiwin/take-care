@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -9,18 +8,19 @@ module Lib
   )
 where
 
+import Config (Group (..), Members (..), Team (..), currentGroupsForTeam, parseTeamList)
 import Control.Lens ((^.))
 import Control.Monad (unless)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (ExceptT)
 import Data.ByteString (ByteString)
+import Data.Foldable (traverse_)
 import Data.List (cycle, elem, nub, null, zip3, (\\))
+import qualified Data.Set as Set
 import Data.Text (Text, filter, intercalate, pack, unlines)
 import Data.Time.Calendar.WeekDate (toWeekDate)
 import Data.Time.Clock (UTCTime (..), getCurrentTime)
 import Data.Traversable (traverse)
-import Dhall (FromDhall, auto, input)
-import GHC.Generics (Generic)
 import Network.Wreq.Session (newAPISession)
 import Slack.Channel as Channel
   ( Channel,
@@ -45,28 +45,11 @@ import Text.Printf (printf)
 import Text.Show.Functions ()
 import Prelude hiding (filter, unlines)
 
-data Members = Members
-  { caretakers :: [[Text]],
-    others :: [Text]
-  }
-  deriving (Generic, Show)
-
-instance FromDhall Members
-
-data Team = Team
-  { members :: Members,
-    team :: Text, -- TODO should be max 21 chars with the tm- prefix, so 18
-    topic :: Text -> Text
-  }
-  deriving (Generic, Show)
-
-instance FromDhall Team
-
 ensure :: Text -> ByteString -> ExceptT Text IO Text
 ensure inputText apiToken = do
   sess <- lift newAPISession
   let netCtx = NetCtx apiToken sess
-  records <- lift $ input auto inputText
+  records <- lift $ parseTeamList inputText
   teamResults <- traverse (wrapTeamResult $ ensureTeamState netCtx) records
   return $ unlines teamResults
   where
@@ -76,7 +59,7 @@ listCaretakers :: Text -> ByteString -> ExceptT Text IO Text
 listCaretakers inputText apiToken = do
   sess <- lift newAPISession
   let netCtx = NetCtx apiToken sess
-  records :: [Team] <- lift $ input auto inputText
+  records :: [Team] <- lift $ parseTeamList inputText
   let teams = concat ((\r -> team r <$ (caretakers . members) r) <$> records)
   caretakerIDs <- traverse (lift . getCaretaker) $ concat (caretakers . members <$> records)
   caretakerDisplayNames <- traverse (fmap (^. displayName) . getUser netCtx) caretakerIDs
@@ -97,18 +80,11 @@ ensureTeamState netCtx record = do
   channel <- findOrCreateChannel netCtx channelName
   let channelID = channel ^. Channel.id
   caretakerIDs <- fmap nub $ traverse (lift . getCaretaker) $ caretakers $ members record
-  ensureChannelTopic netCtx channel (Lib.topic record) caretakerIDs
-  ensureGroupState netCtx teamGroupHandle teamGroupName [channelID] allUserIDs
-  ensureGroupState netCtx caretakerGroupHandle caretakerGroupName [channelID] caretakerIDs
+  ensureChannelTopic netCtx channel (Config.topic record) caretakerIDs
+  time <- lift getCurrentTime
+  traverse_ (ensureGroupState netCtx [channelID]) $ currentGroupsForTeam time record
   where
     channelName = "tm-" <> team record
-    teamGroupHandle = team record <> "-team"
-    teamGroupName = "Team " <> team record
-    caretakerGroupHandle = team record <> "-caretaker"
-    caretakerGroupName = teamGroupName <> " caretaker"
-    allCaretakerIDs = concat $ caretakers $ members record
-    othersIDs = others $ members record
-    allUserIDs = nub (allCaretakerIDs ++ othersIDs)
 
 ensureChannelTopic :: NetCtx -> Channel -> (Text -> Text) -> [Text] -> ExceptT Text IO ()
 ensureChannelTopic netCtx channel buildTopic caretakerIDs = do
@@ -132,17 +108,17 @@ findOrCreateChannel netCtx name = do
   current <- findChannel netCtx name
   maybe (createChannel netCtx name) return current
 
-ensureGroupState :: NetCtx -> Text -> Text -> [Text] -> [Text] -> ExceptT Text IO ()
-ensureGroupState netCtx groupHandle groupName defaultChannelIDs userIDs = do
-  existingGroup <- findGroup netCtx groupHandle
-  group <- maybe createNew return existingGroup
-  let groupID = group ^. Group.id
+ensureGroupState :: NetCtx -> [Text] -> Group -> ExceptT Text IO ()
+ensureGroupState netCtx defaultChannelIDs group = do
+  existingGroup <- findGroup netCtx $ handle group
+  slackGroup <- maybe createNew return existingGroup
+  let groupID = slackGroup ^. Group.id
 
-  currentMembers <- getGroupMembers netCtx groupID
-  unless (same userIDs currentMembers) $ setGroupMembers netCtx groupID userIDs
+  currentMembers <- Set.fromList <$> getGroupMembers netCtx groupID
+  unless (memberIDs group == currentMembers) $ setGroupMembers netCtx groupID $ Set.toList $ memberIDs group
 
-  let currentChannels = group ^. channelIDs
+  let currentChannels = slackGroup ^. channelIDs
   unless (same defaultChannelIDs currentChannels) $ setGroupChannels netCtx groupID defaultChannelIDs
   where
-    createNew = createGroup netCtx groupHandle groupName defaultChannelIDs
+    createNew = createGroup netCtx (handle group) (description group) defaultChannelIDs
     same a b = null (a \\ b) && null (b \\ a)

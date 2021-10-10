@@ -35,6 +35,7 @@ library:
   - time
   - transformers
   - wreq
+  - containers
 
 executables:
   take-care:
@@ -60,3 +61,7 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - take-care
+    - hspec
+    - time
+    - neat-interpolation
+    - containers

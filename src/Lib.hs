@@ -77,14 +77,12 @@ listUsers apiToken = do
 
 ensureTeamState :: NetCtx -> Team -> ExceptT Text IO ()
 ensureTeamState netCtx record = do
-  channel <- findOrCreateChannel netCtx channelName
-  let channelID = channel ^. Channel.id
   time <- lift getCurrentTime
   let desiredTeamState = currentDesiredTeamState time record
+  channel <- findOrCreateChannel netCtx $ teamChannelName desiredTeamState
   ensureChannelTopic netCtx channel desiredTeamState
+  let channelID = channel ^. Channel.id
   traverse_ (ensureGroupState netCtx [channelID]) $ groupList desiredTeamState
-  where
-    channelName = "tm-" <> team record
 
 ensureChannelTopic :: NetCtx -> Channel -> DesiredTeamState -> ExceptT Text IO ()
 ensureChannelTopic netCtx channel desiredTeamState = do

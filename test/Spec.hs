@@ -95,20 +95,20 @@ main = hspec $ do
         `shouldBe` Just
           [trimming|
             Team design:
-              Topic: Stand-up *9:30* :paw_prints: Board :incoming_envelope: https://team.board/url :paw_prints: Caretaker @U22222BOB
-              Group @design-caretaker:
+              #tm-design topic: Stand-up *9:30* :paw_prints: Board :incoming_envelope: https://team.board/url :paw_prints: Caretaker @U22222BOB
+              @design-caretaker group:
                 Description: Team design caretaker(s)
                 Members: @U22222BOB
-              Group @design-team:
+              @design-team group:
                 Description: Team design
                 Members: @U111ALICE, @U22222BOB, @U333CAROL, @U4444DAVE
 
             Team dev:
-              Topic: @U55555EVE, @U77777GIL are the caretakers
-              Group @dev-caretaker:
+              #tm-dev topic: @U55555EVE, @U77777GIL are the caretakers
+              @dev-caretaker group:
                 Description: Team dev caretaker(s)
                 Members: @U55555EVE, @U77777GIL
-              Group @dev-team:
+              @dev-team group:
                 Description: Team dev
                 Members: @U55555EVE, @U6666FAYE, @U77777GIL, @U88888HAL
           |]

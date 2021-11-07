@@ -53,6 +53,7 @@ data Group = Group
 
 data DesiredTeamState = DesiredTeamState
   { teamName :: Text,
+    teamChannelName :: Text,
     groupList :: [Group],
     topicGivenDisplayNames :: forall m. (Monad m) => (Text -> m Text) -> m Text
   }
@@ -76,7 +77,8 @@ showDesiredTeamState getDisplayName desiredTeamState = interUnlines <$> sequence
     lines = titleLine : (padLeft 2 <$$> otherLines)
     titleLine = return $ pack $ printf "Team %s:" $ teamName desiredTeamState
     otherLines = topicLine : groupLines
-    topicLine = ("Topic: " <>) <$> topicGivenDisplayNames desiredTeamState getDisplayName
+    topicLine = pack . printf "#%s topic: %s" (teamChannelName desiredTeamState) <$> topic
+    topic = topicGivenDisplayNames desiredTeamState getDisplayName
     groupLines = showGroup getDisplayName <$> groupList desiredTeamState
 
 (<$$>) f = fmap $ fmap f
@@ -85,7 +87,7 @@ showGroup :: forall m. (Monad m) => (Text -> m Text) -> Group -> m Text
 showGroup getDisplayName group = interUnlines <$> sequence lines
   where
     lines = titleLine : (padLeft 2 <$$> otherLines)
-    titleLine = return $ pack $ printf "Group @%s:" (handle group)
+    titleLine = return $ pack $ printf "@%s group:" (handle group)
     otherLines = [descriptionLine, memberLine]
     descriptionLine = return $ "Description: " <> description group
     memberLine = ("Members: " <>) <$> memberNameListText
@@ -105,6 +107,7 @@ currentDesiredTeamState :: UTCTime -> Team -> DesiredTeamState
 currentDesiredTeamState time team =
   DesiredTeamState
     { teamName = teamName,
+      teamChannelName = "tm-" <> teamName,
       groupList = [caretakers, everyone],
       topicGivenDisplayNames =
         \getDisplayName -> do

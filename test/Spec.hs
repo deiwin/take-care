@@ -103,7 +103,7 @@ main = hspec $ do
                 Description: Team design
                 Members: @U111ALICE, @U22222BOB, @U333CAROL, @U4444DAVE
 
-            Team design:
+            Team dev:
               Topic: @U55555EVE, @U77777GIL are the caretakers
               Group @dev-caretaker:
                 Description: Team dev caretaker(s)

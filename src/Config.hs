@@ -52,7 +52,8 @@ data Group = Group
   deriving (Show, Eq)
 
 data DesiredTeamState = DesiredTeamState
-  { groupList :: [Group],
+  { teamName :: Text,
+    groupList :: [Group],
     topicGivenDisplayNames :: forall m. (Monad m) => (Text -> m Text) -> m Text
   }
 
@@ -73,7 +74,7 @@ showDesiredTeamState :: forall m. (Monad m) => (Text -> m Text) -> DesiredTeamSt
 showDesiredTeamState getDisplayName desiredTeamState = interUnlines <$> sequence lines
   where
     lines = titleLine : (padLeft 2 <$$> otherLines)
-    titleLine = return "Team design:"
+    titleLine = return $ pack $ printf "Team %s:" $ teamName desiredTeamState
     otherLines = topicLine : groupLines
     topicLine = ("Topic: " <>) <$> topicGivenDisplayNames desiredTeamState getDisplayName
     groupLines = showGroup getDisplayName <$> groupList desiredTeamState
@@ -103,7 +104,8 @@ interUnlines = intercalate "\n"
 currentDesiredTeamState :: UTCTime -> Team -> DesiredTeamState
 currentDesiredTeamState time team =
   DesiredTeamState
-    { groupList = [caretakers, everyone],
+    { teamName = teamName,
+      groupList = [caretakers, everyone],
       topicGivenDisplayNames =
         \getDisplayName -> do
           displayNameList <- traverse getDisplayName $ Set.toList caretakerIDs

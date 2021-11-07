@@ -10,6 +10,7 @@ import Config
     currentDesiredTeamState,
     currentGroups,
     parseTeamList,
+    showDesiredTeamStateList,
   )
 import Control.Exception (evaluate)
 import Data.Maybe (Maybe (..), fromJust)
@@ -26,38 +27,7 @@ main :: IO ()
 main = hspec $ do
   describe "Config" $ do
     it "verifies README example" $ do
-      teams <-
-        parseTeamList
-          [trimming|
-              [ { members = { caretakers = [[ "U111ALICE" -- Alice
-                                            , "U22222BOB" -- Bob
-                                            , "U333CAROL" -- Carol
-                                            ]
-                                           ]
-                            , others = [ "U4444DAVE" -- Dave
-                                       ]
-                            }
-                , team = "design"
-                , topic = \(caretaker : Text) ->
-                     let standup   = "Stand-up *9:30*"
-                  in let board     = "Board :incoming_envelope: https://team.board/url"
-                  in let separator = ":paw_prints:"
-                  in "$${standup} $${separator} $${board} $${separator} Caretaker $${caretaker}"
-                }
-              , { members = { caretakers = [[ "U55555EVE" -- Eve
-                                            , "U6666FAYE" -- Faye
-                                            ]
-                                           ,[ "U77777GIL" -- Gil
-                                            , "U88888HAL" -- Hal
-                                            ]
-                                           ]
-                            , others = [] : List Text
-                            }
-                , team = "dev"
-                , topic = \(caretakers : Text) -> "$${caretakers} are the caretakers"
-                }
-              ]
-            |]
+      teams <- parseTeamList readmeText
       time <- iso8601ParseM "2021-10-10T00:00:00Z"
 
       let groups = currentGroups time teams
@@ -116,5 +86,68 @@ main = hspec $ do
                    \Board :incoming_envelope: https://team.board/url :paw_prints: \
                    \Caretaker @U55555EVE, @U77777GIL"
 
+    it "shows formatted desired team states" $ do
+      teams <- parseTeamList readmeText
+      time <- iso8601ParseM "2021-10-10T00:00:00Z"
+      let states = currentDesiredTeamState time <$> teams
+
+      showDesiredTeamStateList mockGetDisplayName states
+        `shouldBe` Just
+          [trimming|
+            Team design:
+              Topic: Stand-up *9:30* :paw_prints: Board :incoming_envelope: https://team.board/url :paw_prints: Caretaker @U22222BOB
+              Group @design-caretaker:
+                Description: Team design caretaker(s)
+                Members: @U22222BOB
+              Group @design-team:
+                Description: Team design
+                Members: @U111ALICE, @U22222BOB, @U333CAROL, @U4444DAVE
+
+            Team design:
+              Topic: @U55555EVE, @U77777GIL are the caretakers
+              Group @dev-caretaker:
+                Description: Team dev caretaker(s)
+                Members: @U55555EVE, @U77777GIL
+              Group @dev-team:
+                Description: Team dev
+                Members: @U55555EVE, @U6666FAYE, @U77777GIL, @U88888HAL
+          |]
+
 mockShowTopic :: (forall m. (Monad m) => (Text -> m Text) -> m Text) -> Text
-mockShowTopic f = fromJust $ f (Just . ("@" <>))
+mockShowTopic f = fromJust $ f mockGetDisplayName
+
+mockGetDisplayName :: Text -> Maybe Text
+mockGetDisplayName = Just . ("@" <>)
+
+readmeText :: Text
+readmeText =
+  [trimming|
+    [ { members = { caretakers = [[ "U111ALICE" -- Alice
+                                  , "U22222BOB" -- Bob
+                                  , "U333CAROL" -- Carol
+                                  ]
+                                 ]
+                  , others = [ "U4444DAVE" -- Dave
+                             ]
+                  }
+      , team = "design"
+      , topic = \(caretaker : Text) ->
+           let standup   = "Stand-up *9:30*"
+        in let board     = "Board :incoming_envelope: https://team.board/url"
+        in let separator = ":paw_prints:"
+        in "$${standup} $${separator} $${board} $${separator} Caretaker $${caretaker}"
+      }
+    , { members = { caretakers = [[ "U55555EVE" -- Eve
+                                  , "U6666FAYE" -- Faye
+                                  ]
+                                 ,[ "U77777GIL" -- Gil
+                                  , "U88888HAL" -- Hal
+                                  ]
+                                 ]
+                  , others = [] : List Text
+                  }
+      , team = "dev"
+      , topic = \(caretakers : Text) -> "$${caretakers} are the caretakers"
+      }
+    ]
+  |]

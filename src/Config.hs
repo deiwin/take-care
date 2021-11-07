@@ -11,18 +11,21 @@ module Config
     parseTeamList,
     currentGroups,
     currentDesiredTeamState,
+    showDesiredTeamStateList,
   )
 where
 
-import Data.List (cycle, elem, nub, null, zip3, (\\))
+import Data.List (cycle)
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Text (Text, filter, intercalate, pack, unlines)
+import Data.Text (Text, intercalate, pack, lines, replicate)
 import Data.Time.Calendar.WeekDate (toWeekDate)
 import Data.Time.Clock (UTCTime (..))
 import Dhall (FromDhall)
 import qualified Dhall (FromDhall, auto, input)
 import GHC.Generics (Generic)
+import Text.Printf (printf)
+import Prelude hiding (lines, replicate)
 
 data Members = Members
   { caretakers :: [[Text]],
@@ -61,6 +64,41 @@ parseTeam = Dhall.input Dhall.auto
 
 currentGroups :: UTCTime -> [Team] -> [Group]
 currentGroups time teams = concat (groupList . currentDesiredTeamState time <$> teams)
+
+showDesiredTeamStateList :: forall m. (Monad m) => (Text -> m Text) -> [DesiredTeamState] -> m Text
+showDesiredTeamStateList getDisplayName desiredTeamStateList =
+  intercalate "\n\n" <$> traverse (showDesiredTeamState getDisplayName) desiredTeamStateList
+
+showDesiredTeamState :: forall m. (Monad m) => (Text -> m Text) -> DesiredTeamState -> m Text
+showDesiredTeamState getDisplayName desiredTeamState = interUnlines <$> sequence lines
+  where
+    lines = titleLine : (padLeft 2 <$$> otherLines)
+    titleLine = return "Team design:"
+    otherLines = topicLine : groupLines
+    topicLine = ("Topic: " <>) <$> topicGivenDisplayNames desiredTeamState getDisplayName
+    groupLines = showGroup getDisplayName <$> groupList desiredTeamState
+
+(<$$>) f = fmap $ fmap f
+
+showGroup :: forall m. (Monad m) => (Text -> m Text) -> Group -> m Text
+showGroup getDisplayName group = interUnlines <$> sequence lines
+  where
+    lines = titleLine : (padLeft 2 <$$> otherLines)
+    titleLine = return $ pack $ printf "Group @%s:" (handle group)
+    otherLines = [descriptionLine, memberLine]
+    descriptionLine = return $ "Description: " <> description group
+    memberLine = ("Members: " <>) <$> memberNameListText
+    memberNameListText = intercalate ", " <$> memberNameList
+    memberNameList = traverse getDisplayName (Set.toList $ memberIDs group)
+
+padLeft :: Int -> Text -> Text
+padLeft spaces = fmapLines (prefix <>)
+  where
+    fmapLines f t = interUnlines (f <$> lines t)
+    prefix = replicate spaces " "
+
+interUnlines :: [Text] -> Text
+interUnlines = intercalate "\n"
 
 currentDesiredTeamState :: UTCTime -> Team -> DesiredTeamState
 currentDesiredTeamState time team =

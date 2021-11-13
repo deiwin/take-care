@@ -13,21 +13,24 @@ import Config
     showDesiredTeamStateList,
   )
 import Control.Exception (evaluate)
+import Data.Function ((&))
 import Data.Maybe (Maybe (..), fromJust)
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Text (Text)
+import Data.Text (Text, lines, unlines)
+import Data.Text.IO (readFile)
 import Data.Time.Calendar.WeekDate (toWeekDate)
 import Data.Time.Clock (UTCTime (..), getCurrentTime)
 import Data.Time.Format.ISO8601 (iso8601ParseM)
 import NeatInterpolation (trimming)
 import Test.Hspec (anyException, describe, hspec, it, shouldBe, shouldMatchList, shouldThrow)
+import Prelude hiding (lines, readFile, unlines)
 
 main :: IO ()
 main = hspec $ do
   describe "Config" $ do
     it "verifies README example" $ do
-      teams <- parseTeamList readmeText
+      teams <- readmeText >>= parseTeamList
       time <- iso8601ParseM "2021-10-10T00:00:00Z"
 
       let groups = currentGroups time teams
@@ -87,7 +90,7 @@ main = hspec $ do
                    \Caretaker @U55555EVE, @U77777GIL"
 
     it "shows formatted desired team states" $ do
-      teams <- parseTeamList readmeText
+      teams <- readmeText >>= parseTeamList
       time <- iso8601ParseM "2021-10-10T00:00:00Z"
       let states = currentDesiredTeamState time <$> teams
 
@@ -119,35 +122,13 @@ mockShowTopic f = fromJust $ f mockGetDisplayName
 mockGetDisplayName :: Text -> Maybe Text
 mockGetDisplayName = Just . ("@" <>)
 
-readmeText :: Text
-readmeText =
-  [trimming|
-    [ { members = { caretakers = [[ "U111ALICE" -- Alice
-                                  , "U22222BOB" -- Bob
-                                  , "U333CAROL" -- Carol
-                                  ]
-                                 ]
-                  , others = [ "U4444DAVE" -- Dave
-                             ]
-                  }
-      , team = "design"
-      , topic = \(caretaker : Text) ->
-           let standup   = "Stand-up *9:30*"
-        in let board     = "Board :incoming_envelope: https://team.board/url"
-        in let separator = ":paw_prints:"
-        in "$${standup} $${separator} $${board} $${separator} Caretaker $${caretaker}"
-      }
-    , { members = { caretakers = [[ "U55555EVE" -- Eve
-                                  , "U6666FAYE" -- Faye
-                                  ]
-                                 ,[ "U77777GIL" -- Gil
-                                  , "U88888HAL" -- Hal
-                                  ]
-                                 ]
-                  , others = [] : List Text
-                  }
-      , team = "dev"
-      , topic = \(caretakers : Text) -> "$${caretakers} are the caretakers"
-      }
-    ]
-  |]
+readmeText :: IO Text
+readmeText = firstCodeBlock <$> readme
+  where
+    readme = readFile "README.md"
+    firstCodeBlock t =
+      lines t
+        & dropWhile (/= "```haskell")
+        & tail
+        & takeWhile (/= "```")
+        & unlines

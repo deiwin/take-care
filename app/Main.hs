@@ -5,14 +5,14 @@ module Main where
 import Control.Monad.Trans.Except (ExceptT, runExceptT)
 import Data.ByteString (ByteString)
 import Data.ByteString.Char8 as BS (pack)
-import Data.List (elem, intercalate, isPrefixOf, null)
+import Data.List (elem, intercalate, isPrefixOf, null, partition)
 import Data.Maybe (fromMaybe)
 import Data.Monoid (mconcat)
 import Data.Text (Text)
 import Data.Text.IO (getContents, readFile)
 import qualified Data.Text.IO as TIO (putStrLn)
 import Data.Traversable (traverse)
-import Lib (ensure, listCaretakers, listUsers)
+import Lib (ensure, dryRunEnsure, listUsers)
 import System.Environment (getArgs, lookupEnv)
 import System.Exit (exitFailure, exitSuccess)
 import Prelude hiding (getContents, readFile)
@@ -25,27 +25,37 @@ parse args
   | elem "-h" flags
       || elem "--help" flags =
     usage >> exitSuccess
+  where
+    flags = filter ("-" `isPrefixOf`) args
+parse ("ensure" : rest)
+  | elem "-D" flags
+      || elem "--dry-run" flags =
+    runDryRunEnsure =<< readInput input
+  | not (null flags) = printFlags >> usage >> exitFailure
+  | otherwise = runEnsure =<< readInput input
+  where
+    printFlags = putStrLn ("Unknown flags: " <> intercalate "," flags)
+    (flags, input) = partition ("-" `isPrefixOf`) rest
+parse args
   | not (null flags) = printFlags >> usage >> exitFailure
   where
     flags = filter ("-" `isPrefixOf`) args
     printFlags = putStrLn ("Unknown flags: " <> intercalate "," flags)
-parse ("ensure" : rest) = runEnsure =<< readInput rest
-parse ("list-caretakers" : rest) = runListCaretakers =<< readInput rest
 parse ["list-users"] = runListUsers
 parse _ = usage >> exitFailure
 
 usage :: IO ()
 usage =
   putStrLn
-    "Usage: take-care [-h|--help] ensure [file ..]\n\
-    \                             list-caretakers [file ..]\n\
-    \                             list-users\n"
+    "Usage: take-care [-h|--help] list-users\n\
+    \                             ensure [file ..]\n\
+    \                             ensure --dry-run [file ..]\n"
 
 runEnsure :: Text -> IO ()
 runEnsure inputText = getApiToken >>= (handleResult . ensure inputText)
 
-runListCaretakers :: Text -> IO ()
-runListCaretakers inputText = getApiToken >>= (handleResult . listCaretakers inputText)
+runDryRunEnsure :: Text -> IO ()
+runDryRunEnsure inputText = getApiToken >>= (handleResult . dryRunEnsure inputText)
 
 runListUsers :: IO ()
 runListUsers = getApiToken >>= (handleResult . listUsers)

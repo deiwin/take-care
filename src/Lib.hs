@@ -3,12 +3,20 @@
 
 module Lib
   ( ensure,
-    listCaretakers,
+    dryRunEnsure,
     listUsers,
   )
 where
 
-import Config (DesiredTeamState (..), Group (..), Members (..), Team (..), currentDesiredTeamState, parseTeamList)
+import Config
+  ( DesiredTeamState (..),
+    Group (..),
+    Members (..),
+    Team (..),
+    currentDesiredTeamState,
+    parseTeamList,
+    showDesiredTeamStateList,
+  )
 import Control.Lens ((^.))
 import Control.Monad (unless)
 import Control.Monad.Trans.Class (lift)
@@ -47,30 +55,25 @@ import Prelude hiding (filter, unlines)
 
 ensure :: Text -> ByteString -> ExceptT Text IO Text
 ensure inputText apiToken = do
-  sess <- lift newAPISession
-  let netCtx = NetCtx apiToken sess
+  netCtx <- lift (NetCtx apiToken <$> newAPISession)
   records <- lift $ parseTeamList inputText
   teamResults <- traverse (wrapTeamResult $ ensureTeamState netCtx) records
   return $ unlines teamResults
   where
     wrapTeamResult f record = ("Team " <> team record <> ": success!") <$ f record
 
-listCaretakers :: Text -> ByteString -> ExceptT Text IO Text
-listCaretakers inputText apiToken = do
-  sess <- lift newAPISession
-  let netCtx = NetCtx apiToken sess
-  records :: [Team] <- lift $ parseTeamList inputText
-  let teams = concat ((\r -> team r <$ (caretakers . members) r) <$> records)
-  caretakerIDs <- traverse (lift . getCaretaker) $ concat (caretakers . members <$> records)
-  caretakerDisplayNames <- traverse (fmap (^. displayName) . getUser netCtx) caretakerIDs
-  return $ unlines $ formatLine <$> zip3 teams caretakerDisplayNames caretakerIDs
+dryRunEnsure :: Text -> ByteString -> ExceptT Text IO Text
+dryRunEnsure inputText apiToken = do
+  time <- lift getCurrentTime
+  desiredStateList <- lift (currentDesiredTeamState time <$$> parseTeamList inputText)
+  netCtx <- lift (NetCtx apiToken <$> newAPISession)
+  showDesiredTeamStateList (getDisplayName netCtx) desiredStateList
   where
-    formatLine (teamName, userName, userID) = pack $ printf "Team %s: %s (%s)" teamName userName userID
+    getDisplayName netCtx = fmap (^. displayName) . getUser netCtx
 
 listUsers :: ByteString -> ExceptT Text IO Text
 listUsers apiToken = do
-  sess <- lift newAPISession
-  let netCtx = NetCtx apiToken sess
+  netCtx <- lift (NetCtx apiToken <$> newAPISession)
   unlines . fmap formatLine <$> listAllUsers netCtx
   where
     formatLine user = pack $ printf "%s: %s" (user ^. User.id) (user ^. displayName)
@@ -95,11 +98,6 @@ ensureChannelTopic netCtx channel desiredTeamState = do
     clean = filter (not . potentialAddedChar)
     potentialAddedChar c = c `elem` ['<', '>']
 
-getCaretaker :: [Text] -> IO Text
-getCaretaker userIDs = do
-  (_, currentUtcWeek, _) <- toWeekDate . utctDay <$> getCurrentTime
-  return $ cycle userIDs !! currentUtcWeek
-
 findOrCreateChannel :: NetCtx -> Text -> ExceptT Text IO Channel
 findOrCreateChannel netCtx name = do
   current <- findChannel netCtx name
@@ -119,3 +117,5 @@ ensureGroupState netCtx defaultChannelIDs group = do
   where
     createNew = createGroup netCtx (handle group) (description group) defaultChannelIDs
     same a b = null (a \\ b) && null (b \\ a)
+
+(<$$>) f = fmap $ fmap f

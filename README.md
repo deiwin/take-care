@@ -93,13 +93,28 @@ a programmable configuration language with Haskell-like syntax.
 ]
 ```
 
-Verify the configuration with the `list-caretakers` command.
+Verify the configuration with the `--dry-run` flag for the `ensure`
+command.
 
-```
-$ docker run --rm -i -e "API_TOKEN=$API_TOKEN" deiwin/take-care:latest list-caretakers < teams.dhall
-Team design: @bob (U22222BOB)
-Team dev: @eve (U55555EVE)
-Team dev: @gil (U77777GIL)
+```dryRunExample
+$ docker run --rm -i -e "API_TOKEN=$API_TOKEN" deiwin/take-care:latest ensure --dry-run < teams.dhall
+Team design:
+  #tm-design topic: Stand-up *9:30* :paw_prints: Board :incoming_envelope: https://team.board/url :paw_prints: Caretaker @U22222BOB
+  @design-caretaker group:
+    Description: Team design caretaker(s)
+    Members: @U22222BOB
+  @design-team group:
+    Description: Team design
+    Members: @U111ALICE, @U22222BOB, @U333CAROL, @U4444DAVE
+
+Team dev:
+  #tm-dev topic: @U55555EVE, @U77777GIL are the caretakers
+  @dev-caretaker group:
+    Description: Team dev caretaker(s)
+    Members: @U55555EVE, @U77777GIL
+  @dev-team group:
+    Description: Team dev
+    Members: @U55555EVE, @U6666FAYE, @U77777GIL, @U88888HAL
 ```
 
 And finally, run the `ensure` command.

@@ -17,7 +17,7 @@ import Data.Function ((&))
 import Data.Maybe (Maybe (..), fromJust)
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Text (Text, lines, unlines)
+import Data.Text (Text, lines, unlines, intercalate)
 import Data.Text.IO (readFile)
 import Data.Time.Calendar.WeekDate (toWeekDate)
 import Data.Time.Clock (UTCTime (..), getCurrentTime)
@@ -62,38 +62,27 @@ main = hspec $ do
       time <- iso8601ParseM "2021-10-10T00:00:00Z"
       let states = currentDesiredTeamState time <$> teams
 
-      showDesiredTeamStateList mockGetDisplayName states
-        `shouldBe` Just
-          [trimming|
-            Team design:
-              #tm-design topic: Stand-up *9:30* :paw_prints: Board :incoming_envelope: https://team.board/url :paw_prints: Caretaker @U22222BOB
-              @design-caretaker group:
-                Description: Team design caretaker(s)
-                Members: @U22222BOB
-              @design-team group:
-                Description: Team design
-                Members: @U111ALICE, @U22222BOB, @U333CAROL, @U4444DAVE
-
-            Team dev:
-              #tm-dev topic: @U55555EVE, @U77777GIL are the caretakers
-              @dev-caretaker group:
-                Description: Team dev caretaker(s)
-                Members: @U55555EVE, @U77777GIL
-              @dev-team group:
-                Description: Team dev
-                Members: @U55555EVE, @U6666FAYE, @U77777GIL, @U88888HAL
-          |]
+      result <- dryRunExample
+      showDesiredTeamStateList mockGetDisplayName states `shouldBe` Just result
 
 mockGetDisplayName :: Text -> Maybe Text
 mockGetDisplayName = Just . ("@" <>)
 
 readmeText :: IO Text
-readmeText = firstCodeBlock <$> readme
+readmeText = readBlock "haskell" <$> readFile "README.md"
+
+dryRunExample :: IO Text
+dryRunExample = skipFirstLine . readBlock "dryRunExample" <$> readFile "README.md"
   where
-    readme = readFile "README.md"
-    firstCodeBlock t =
-      lines t
-        & dropWhile (/= "```haskell")
-        & tail
-        & takeWhile (/= "```")
-        & unlines
+    skipFirstLine = interUnlines . tail . lines
+
+readBlock :: Text -> Text -> Text
+readBlock tag text =
+  lines text
+    & dropWhile (/= ("```" <> tag))
+    & tail
+    & takeWhile (/= "```")
+    & unlines
+
+interUnlines :: [Text] -> Text
+interUnlines = intercalate "\n"

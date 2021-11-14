@@ -73,7 +73,7 @@ ensure inputText apiToken = do
 dryRunEnsure :: Text -> ByteString -> Result Text
 dryRunEnsure inputText apiToken = do
   time <- lift getCurrentTime
-  desiredStateList <- lift (currentDesiredTeamState time <$$> parseTeamList inputText)
+  desiredStateList <- lift $ currentDesiredTeamState time <<$>> parseTeamList inputText
   netCtx <- lift (NetCtx apiToken <$> newAPISession)
   getDisplayName <- getDisplayNameM netCtx
   showDesiredTeamStateList getDisplayName desiredStateList
@@ -132,4 +132,6 @@ getDisplayNameM netCtx = do
   where
     toPair user = (user ^. User.id, user ^. displayName)
 
-(<$$>) f = fmap $ fmap f
+infixl 4 <<$>>
+(<<$>>) :: (Functor f, Functor g) => (a -> b) -> f (g a) -> f (g b)
+(<<$>>) = fmap . fmap

@@ -74,19 +74,17 @@ showDesiredTeamStateList getDisplayName desiredTeamStateList =
 showDesiredTeamState :: forall m. (Monad m) => (Text -> m Text) -> DesiredTeamState -> m Text
 showDesiredTeamState getDisplayName desiredTeamState = interUnlines <$> sequence lines
   where
-    lines = titleLine : (padLeft 2 <$$> otherLines)
+    lines = titleLine : (padLeft 2 <<$>> otherLines)
     titleLine = return $ pack $ printf "Team %s:" $ teamName desiredTeamState
     otherLines = topicLine : groupLines
     topicLine = pack . printf "#%s topic: %s" (teamChannelName desiredTeamState) <$> topic
     topic = topicGivenDisplayNames desiredTeamState getDisplayName
     groupLines = showGroup getDisplayName <$> groupList desiredTeamState
 
-(<$$>) f = fmap $ fmap f
-
 showGroup :: forall m. (Monad m) => (Text -> m Text) -> Group -> m Text
 showGroup getDisplayName group = interUnlines <$> sequence lines
   where
-    lines = titleLine : (padLeft 2 <$$> otherLines)
+    lines = titleLine : (padLeft 2 <<$>> otherLines)
     titleLine = return $ pack $ printf "@%s group:" (handle group)
     otherLines = [descriptionLine, memberLine]
     descriptionLine = return $ "Description: " <> description group
@@ -137,3 +135,7 @@ currentCaretaker :: UTCTime -> [Text] -> Text
 currentCaretaker time candidates = cycle candidates !! utcWeek
   where
     (_, utcWeek, _) = toWeekDate $ utctDay time
+
+infixl 4 <<$>>
+(<<$>>) :: (Functor f, Functor g) => (a -> b) -> f (g a) -> f (g b)
+(<<$>>) = fmap . fmap

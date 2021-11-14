@@ -15,14 +15,13 @@ module Config
   )
 where
 
-import Data.List (cycle)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Text (Text, intercalate, pack, lines, replicate)
 import Data.Time.Calendar.WeekDate (toWeekDate)
 import Data.Time.Clock (UTCTime (..))
 import Dhall (FromDhall)
-import qualified Dhall (FromDhall, auto, input)
+import qualified Dhall (auto, input)
 import GHC.Generics (Generic)
 import Text.Printf (printf)
 import Prelude hiding (lines, replicate)
@@ -60,9 +59,6 @@ data DesiredTeamState = DesiredTeamState
 
 parseTeamList :: Text -> IO [Team]
 parseTeamList = Dhall.input Dhall.auto
-
-parseTeam :: Text -> IO Team
-parseTeam = Dhall.input Dhall.auto
 
 currentGroups :: UTCTime -> [Team] -> [Group]
 currentGroups time teams = concat (groupList . currentDesiredTeamState time <$> teams)

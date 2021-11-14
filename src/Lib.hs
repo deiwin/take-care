@@ -11,7 +11,6 @@ where
 import Config
   ( DesiredTeamState (..),
     Group (..),
-    Members (..),
     Team (..),
     currentDesiredTeamState,
     parseTeamList,
@@ -24,14 +23,11 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (ExceptT)
 import Data.ByteString (ByteString)
 import Data.Foldable (traverse_)
-import Data.List (cycle, elem, nub, null, zip3, (\\))
-import Data.Map (Map)
+import Data.List ((\\))
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
-import Data.Text (Text, filter, intercalate, pack, unlines)
-import Data.Time.Calendar.WeekDate (toWeekDate)
-import Data.Time.Clock (UTCTime (..), getCurrentTime)
-import Data.Traversable (traverse)
+import Data.Text (Text, filter, pack, unlines)
+import Data.Time.Clock (getCurrentTime)
 import Network.Wreq.Session (newAPISession)
 import Slack.Channel as Channel
   ( Channel,
@@ -50,7 +46,7 @@ import Slack.Group as Group
     setGroupChannels,
     setGroupMembers,
   )
-import Slack.User as User (displayName, getUser, id, listAllUsers)
+import Slack.User as User (displayName, id, listAllUsers)
 import Slack.Util (NetCtx (..))
 import Text.Printf (printf)
 import Text.Show.Functions ()
@@ -133,5 +129,6 @@ getDisplayNameM netCtx = do
     toPair user = (user ^. User.id, user ^. displayName)
 
 infixl 4 <<$>>
+
 (<<$>>) :: (Functor f, Functor g) => (a -> b) -> f (g a) -> f (g b)
 (<<$>>) = fmap . fmap

@@ -24,7 +24,7 @@ import Data.ByteString (ByteString)
 import Data.Maybe (maybeToList)
 import Data.Text as T (Text, null, pack)
 import Network.Wreq (Options, Response, asValue, auth, defaults, oauth2Bearer, param, responseBody)
-import Network.Wreq.Session (Session (..), getWith, postWith)
+import Network.Wreq.Session (Session, getWith, postWith)
 import Prelude hiding (error)
 
 data NetCtx = NetCtx ByteString Session

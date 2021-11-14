@@ -22,6 +22,16 @@ description:         Please see the README on GitHub at <https://github.com/deiw
 dependencies:
 - base >= 4.7 && < 5
 
+ghc-options:
+- -Wunused-binds
+- -Wunused-matches
+- -Wunused-foralls
+- -Wunused-imports
+- -Wincomplete-patterns
+- -Wdodgy-exports
+- -Wdodgy-imports
+- -Wunbanged-strict-patterns
+
 library:
   source-dirs: src
   dependencies:

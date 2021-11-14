@@ -17,6 +17,8 @@ import Config
     parseTeamList,
     showDesiredTeamStateList,
   )
+
+import Control.Error.Util ((??))
 import Control.Lens ((^.))
 import Control.Monad (unless)
 import Control.Monad.Trans.Class (lift)
@@ -25,6 +27,8 @@ import Data.ByteString (ByteString)
 import Data.Foldable (traverse_)
 import Data.List (cycle, elem, nub, null, zip3, (\\))
 import qualified Data.Set as Set
+import Data.Map (Map)
+import qualified Data.Map.Strict as Map
 import Data.Text (Text, filter, intercalate, pack, unlines)
 import Data.Time.Calendar.WeekDate (toWeekDate)
 import Data.Time.Clock (UTCTime (..), getCurrentTime)
@@ -57,19 +61,26 @@ ensure :: Text -> ByteString -> ExceptT Text IO Text
 ensure inputText apiToken = do
   netCtx <- lift (NetCtx apiToken <$> newAPISession)
   records <- lift $ parseTeamList inputText
-  teamResults <- traverse (wrapTeamResult $ ensureTeamState netCtx) records
+  getDisplayName <- getDisplayNameM netCtx
+  teamResults <- traverse (wrapTeamResult $ ensureTeamState netCtx getDisplayName) records
   return $ unlines teamResults
   where
     wrapTeamResult f record = ("Team " <> team record <> ": success!") <$ f record
+
+getDisplayNameM :: NetCtx -> ExceptT Text IO (Text -> ExceptT Text IO Text)
+getDisplayNameM netCtx = do
+  map <- Map.fromList . fmap toPair <$> listAllUsers netCtx
+  return $ \id -> Map.lookup id map ?? pack (printf "Could not find user with ID: %s" id)
+  where
+    toPair user = (user ^. User.id, user ^. displayName)
 
 dryRunEnsure :: Text -> ByteString -> ExceptT Text IO Text
 dryRunEnsure inputText apiToken = do
   time <- lift getCurrentTime
   desiredStateList <- lift (currentDesiredTeamState time <$$> parseTeamList inputText)
   netCtx <- lift (NetCtx apiToken <$> newAPISession)
-  showDesiredTeamStateList (getDisplayName netCtx) desiredStateList
-  where
-    getDisplayName netCtx = fmap (^. displayName) . getUser netCtx
+  getDisplayName <- getDisplayNameM netCtx
+  showDesiredTeamStateList getDisplayName desiredStateList
 
 listUsers :: ByteString -> ExceptT Text IO Text
 listUsers apiToken = do
@@ -78,18 +89,18 @@ listUsers apiToken = do
   where
     formatLine user = pack $ printf "%s: %s" (user ^. User.id) (user ^. displayName)
 
-ensureTeamState :: NetCtx -> Team -> ExceptT Text IO ()
-ensureTeamState netCtx record = do
+ensureTeamState :: NetCtx -> (Text -> ExceptT Text IO Text) -> Team -> ExceptT Text IO ()
+ensureTeamState netCtx getDisplayName record = do
   time <- lift getCurrentTime
   let desiredTeamState = currentDesiredTeamState time record
   channel <- findOrCreateChannel netCtx $ teamChannelName desiredTeamState
-  ensureChannelTopic netCtx channel desiredTeamState
+  ensureChannelTopic netCtx getDisplayName channel desiredTeamState
   let channelID = channel ^. Channel.id
   traverse_ (ensureGroupState netCtx [channelID]) $ groupList desiredTeamState
 
-ensureChannelTopic :: NetCtx -> Channel -> DesiredTeamState -> ExceptT Text IO ()
-ensureChannelTopic netCtx channel desiredTeamState = do
-  newTopic <- topicGivenDisplayNames desiredTeamState (fmap (^. displayName) . getUser netCtx)
+ensureChannelTopic :: NetCtx -> (Text -> ExceptT Text IO Text) -> Channel -> DesiredTeamState -> ExceptT Text IO ()
+ensureChannelTopic netCtx getDisplayName channel desiredTeamState = do
+  newTopic <- topicGivenDisplayNames desiredTeamState getDisplayName
   unless (same currentTopic newTopic) $ setChannelTopic netCtx channelID newTopic
   where
     channelID = channel ^. Channel.id

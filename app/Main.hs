@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Main where
 
 import Control.Monad.Trans.Except (ExceptT, runExceptT)

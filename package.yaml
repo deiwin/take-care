@@ -31,6 +31,14 @@ ghc-options:
 - -Wdodgy-exports
 - -Wdodgy-imports
 - -Wunbanged-strict-patterns
+default-extensions:
+- OverloadedStrings
+- RankNTypes
+- ScopedTypeVariables
+- DeriveGeneric
+- RecordWildCards
+- TemplateHaskell
+- BangPatterns
 
 library:
   source-dirs: src

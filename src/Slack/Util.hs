@@ -1,7 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 module Slack.Util
   ( slackGet,
     slackGetPaginated,

@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Slack.ChannelSpec (spec) where
 
 import Test.Hspec

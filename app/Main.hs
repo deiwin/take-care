@@ -8,7 +8,7 @@ import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Text.IO (getContents, readFile)
 import qualified Data.Text.IO as TIO (putStrLn)
-import Lib (ensure, dryRunEnsure, listUsers)
+import Lib (dryRunEnsure, ensure, listUsers)
 import Polysemy (Final, Sem, runFinal)
 import System.Environment (getArgs, lookupEnv)
 import System.Exit (exitFailure, exitSuccess)
@@ -61,8 +61,13 @@ type CanonicalEffects =
   '[ Final IO
    ]
 
+runCanonical :: ExceptT Text (Sem CanonicalEffects) Text -> IO (Either Text Text)
+runCanonical =
+  runFinal
+    . runExceptT
+
 handleResult :: ExceptT Text (Sem CanonicalEffects) Text -> IO ()
-handleResult result = (runFinal . runExceptT) result >>= logResult
+handleResult result = runCanonical result >>= logResult
   where
     logResult (Left message) = TIO.putStrLn message >> exitFailure
     logResult (Right message) = TIO.putStrLn message >> exitSuccess

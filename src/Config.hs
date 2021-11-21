@@ -12,7 +12,7 @@ where
 
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Text (Text, intercalate, pack, lines, replicate)
+import Data.Text (Text, intercalate, lines, pack, replicate)
 import Data.Time.Calendar.WeekDate (toWeekDate)
 import Data.Time.Clock (UTCTime (..))
 import Dhall (FromDhall)
@@ -128,5 +128,6 @@ currentCaretaker time candidates = cycle candidates !! utcWeek
     (_, utcWeek, _) = toWeekDate $ utctDay time
 
 infixl 4 <<$>>
+
 (<<$>>) :: (Functor f, Functor g) => (a -> b) -> f (g a) -> f (g b)
 (<<$>>) = fmap . fmap

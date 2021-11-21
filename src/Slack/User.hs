@@ -17,6 +17,7 @@ import Data.Maybe (fromMaybe)
 import Data.Text as T (Text, null)
 import GHC.Generics (Generic)
 import Network.Wreq (defaults, param)
+import Polysemy (Final, Member, Sem)
 import Slack.Util (NetCtx, fromJSON, slackGet, slackGetPaginated)
 import Prelude hiding (id)
 
@@ -40,14 +41,14 @@ instance FromJSON User where
     let _displayName = "@" <> fromMaybe name nonEmptyDisplayName
     return User {..}
 
-getUser :: NetCtx -> Text -> ExceptT Text IO User
+getUser :: Member (Final IO) r => NetCtx -> Text -> ExceptT Text (Sem r) User
 getUser netCtx userID = do
   let opts = defaults & param "user" .~ [userID]
   respBody <- slackGet netCtx opts "users.info"
   val <- (respBody ^? key "user") ?? "\"users.info\" response didn't include a \"user\" field"
   fromJSON val
 
-listAllUsers :: NetCtx -> ExceptT Text IO [User]
+listAllUsers :: Member (Final IO) r => NetCtx -> ExceptT Text (Sem r) [User]
 listAllUsers netCtx = do
   respBodies <- slackGetPaginated netCtx defaults "users.list"
   vals <-

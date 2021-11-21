@@ -21,6 +21,8 @@ description:         Please see the README on GitHub at <https://github.com/deiw
 
 dependencies:
 - base >= 4.7 && < 5
+- polysemy
+- polysemy-plugin
 
 ghc-options:
 - -Wunused-binds
@@ -31,10 +33,22 @@ ghc-options:
 - -Wdodgy-exports
 - -Wdodgy-imports
 - -Wunbanged-strict-patterns
+- -fplugin=Polysemy.Plugin
+- -O2
+- -flate-specialise
+- -fspecialise-aggressively
 default-extensions:
 - OverloadedStrings
+- DataKinds
+- FlexibleContexts
+- GADTs
+- LambdaCase
+- PolyKinds
 - RankNTypes
 - ScopedTypeVariables
+- TypeApplications
+- TypeOperators
+- TypeFamilies
 - DeriveGeneric
 - RecordWildCards
 - TemplateHaskell

@@ -9,6 +9,7 @@ import Data.Text (Text)
 import Data.Text.IO (getContents, readFile)
 import qualified Data.Text.IO as TIO (putStrLn)
 import Lib (ensure, dryRunEnsure, listUsers)
+import Polysemy (Final, Sem, runFinal)
 import System.Environment (getArgs, lookupEnv)
 import System.Exit (exitFailure, exitSuccess)
 import Prelude hiding (getContents, readFile)
@@ -56,8 +57,12 @@ runDryRunEnsure inputText = getApiToken >>= (handleResult . dryRunEnsure inputTe
 runListUsers :: IO ()
 runListUsers = getApiToken >>= (handleResult . listUsers)
 
-handleResult :: ExceptT Text IO Text -> IO ()
-handleResult result = runExceptT result >>= logResult
+type CanonicalEffects =
+  '[ Final IO
+   ]
+
+handleResult :: ExceptT Text (Sem CanonicalEffects) Text -> IO ()
+handleResult result = (runFinal . runExceptT) result >>= logResult
   where
     logResult (Left message) = TIO.putStrLn message >> exitFailure
     logResult (Right message) = TIO.putStrLn message >> exitSuccess

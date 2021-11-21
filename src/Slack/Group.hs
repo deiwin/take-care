@@ -21,6 +21,7 @@ import Data.List (find, intercalate)
 import Data.Text (Text, unpack)
 import GHC.Generics (Generic)
 import Network.Wreq (defaults, param)
+import Polysemy (Final, Member, Sem)
 import Slack.Util (NetCtx, fromJSON, slackGet, slackPost)
 import Prelude hiding (id)
 
@@ -41,7 +42,7 @@ instance FromJSON Group where
     _channelIDs <- prefs .: "channels"
     return Group {..}
 
-getGroupMembers :: NetCtx -> Text -> ExceptT Text IO [Text]
+getGroupMembers :: Member (Final IO) r => NetCtx -> Text -> ExceptT Text (Sem r) [Text]
 getGroupMembers netCtx groupID = do
   let opts =
         defaults & param "usergroup" .~ [groupID]
@@ -49,7 +50,7 @@ getGroupMembers netCtx groupID = do
   respBody <- slackGet netCtx opts "usergroups.users.list"
   return $ respBody ^.. key "users" . values . _String
 
-setGroupMembers :: NetCtx -> Text -> [Text] -> ExceptT Text IO ()
+setGroupMembers :: Member (Final IO) r => NetCtx -> Text -> [Text] -> ExceptT Text (Sem r) ()
 setGroupMembers netCtx groupID userIDs = do
   let params =
         [ "usergroup" .= groupID,
@@ -58,7 +59,7 @@ setGroupMembers netCtx groupID userIDs = do
   _ <- slackPost netCtx params "usergroups.users.update"
   return ()
 
-setGroupChannels :: NetCtx -> Text -> [Text] -> ExceptT Text IO ()
+setGroupChannels :: Member (Final IO) r => NetCtx -> Text -> [Text] -> ExceptT Text (Sem r) ()
 setGroupChannels netCtx groupID defaultChannelIDs = do
   let params =
         [ "usergroup" .= groupID,
@@ -67,7 +68,7 @@ setGroupChannels netCtx groupID defaultChannelIDs = do
   _ <- slackPost netCtx params "usergroups.update"
   return ()
 
-findGroup :: NetCtx -> Text -> ExceptT Text IO (Maybe Group)
+findGroup :: Member (Final IO) r => NetCtx -> Text -> ExceptT Text (Sem r) (Maybe Group)
 findGroup netCtx expectedHandle = do
   let opts = defaults & param "include_disabled" .~ ["true"]
   respBody <- slackGet netCtx opts "usergroups.list"
@@ -77,7 +78,7 @@ findGroup netCtx expectedHandle = do
       =<< ((respBody ^? key "usergroups") ?? "\"users.list\" response didn't include a \"channels\" field")
   return $ find (\x -> (x ^. handle) == expectedHandle) groups
 
-createGroup :: NetCtx -> Text -> Text -> [Text] -> ExceptT Text IO Group
+createGroup :: Member (Final IO) r => NetCtx -> Text -> Text -> [Text] -> ExceptT Text (Sem r) Group
 createGroup netCtx groupHandle groupName defaultChannelIDs = do
   let params =
         [ "handle" .= groupHandle,

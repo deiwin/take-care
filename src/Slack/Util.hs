@@ -21,6 +21,7 @@ import Data.Maybe (maybeToList)
 import Data.Text as T (Text, null, pack)
 import Network.Wreq (Options, Response, asValue, auth, defaults, oauth2Bearer, param, responseBody)
 import Network.Wreq.Session (Session, getWith, postWith)
+import Polysemy (Final, Member, Sem, embedFinal)
 import Prelude hiding (error)
 
 data NetCtx = NetCtx ByteString Session
@@ -28,17 +29,24 @@ data NetCtx = NetCtx ByteString Session
 slackURL :: String -> String
 slackURL = ("https://slack.com/api/" ++)
 
-slackGet :: NetCtx -> Options -> String -> ExceptT Text IO Value
+slackGet :: Member (Final IO) r => NetCtx -> Options -> String -> ExceptT Text (Sem r) Value
 slackGet (NetCtx apiToken sess) opts method = do
   let optsWithAuth = opts & auth ?~ oauth2Bearer apiToken
   let url = slackURL method
-  resp <- lift (asValue =<< getWith optsWithAuth sess url)
+  resp <- lift $ embedFinal (asValue =<< getWith optsWithAuth sess url)
   hoistEither $ handleSlackError "GET" method resp
 
-slackGetPaginated :: NetCtx -> Options -> String -> ExceptT Text IO [Value]
+slackGetPaginated :: Member (Final IO) r => NetCtx -> Options -> String -> ExceptT Text (Sem r) [Value]
 slackGetPaginated = slackGetPaginated' Nothing []
 
-slackGetPaginated' :: Maybe Text -> [Value] -> NetCtx -> Options -> String -> ExceptT Text IO [Value]
+slackGetPaginated' ::
+  Member (Final IO) r =>
+  Maybe Text ->
+  [Value] ->
+  NetCtx ->
+  Options ->
+  String ->
+  ExceptT Text (Sem r) [Value]
 slackGetPaginated' cursor !acc netCtx opts method = do
   let optsWithCursor = opts & param "cursor" .~ maybeToList cursor
   respBody <- slackGet netCtx optsWithCursor method
@@ -48,12 +56,12 @@ slackGetPaginated' cursor !acc netCtx opts method = do
     Just _ -> slackGetPaginated' nextCursor nextAcc netCtx opts method
     Nothing -> return $ reverse nextAcc
 
-slackPost :: NetCtx -> [Pair] -> String -> ExceptT Text IO Value
+slackPost :: Member (Final IO) r => NetCtx -> [Pair] -> String -> ExceptT Text (Sem r) Value
 slackPost (NetCtx apiToken sess) params method = do
   let optsWithAuth = defaults & auth ?~ oauth2Bearer apiToken
   let url = slackURL method
   let body = toJSON $ object params
-  resp <- lift $ asValue =<< postWith optsWithAuth sess url body
+  resp <- lift $ embedFinal $ asValue =<< postWith optsWithAuth sess url body
   hoistEither $ handleSlackError "POST" method resp
 
 handleSlackError :: Text -> String -> Response Value -> Either Text Value

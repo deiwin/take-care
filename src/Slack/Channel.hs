@@ -18,6 +18,7 @@ import Data.List as L (find)
 import Data.Text (Text)
 import GHC.Generics (Generic)
 import Network.Wreq (defaults, param)
+import Polysemy (Final, Member, Sem)
 import Slack.Util (NetCtx, fromJSON, slackGetPaginated, slackPost)
 import Prelude hiding (id)
 
@@ -38,7 +39,7 @@ instance FromJSON Channel where
     _topic <- topicObject .: "value"
     return Channel {..}
 
-findChannel :: NetCtx -> Text -> ExceptT Text IO (Maybe Channel)
+findChannel :: Member (Final IO) r => NetCtx -> Text -> ExceptT Text (Sem r) (Maybe Channel)
 findChannel netCtx expectedName = do
   let params =
         defaults & param "types" .~ ["public_channel,private_channel"]
@@ -51,14 +52,14 @@ findChannel netCtx expectedName = do
       =<< (traverse (^? key "channels") respBodies ?? "\"users.list\" response didn't include a \"channels\" field")
   return $ find (\x -> (x ^. name) == expectedName) channels
 
-createChannel :: NetCtx -> Text -> ExceptT Text IO Channel
+createChannel :: Member (Final IO) r => NetCtx -> Text -> ExceptT Text (Sem r) Channel
 createChannel netCtx newName = do
   let params = ["name" .= newName]
   respBody <- slackPost netCtx params "conversations.create"
   val <- (respBody ^? key "channel") ?? "\"conversations.create\" response didn't include a \"channel\" key"
   fromJSON val
 
-setChannelTopic :: NetCtx -> Text -> Text -> ExceptT Text IO ()
+setChannelTopic :: Member (Final IO) r => NetCtx -> Text -> Text -> ExceptT Text (Sem r) ()
 setChannelTopic netCtx channelID newTopic = do
   let params =
         [ "channel" .= channelID,

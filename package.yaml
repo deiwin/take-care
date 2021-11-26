@@ -38,21 +38,21 @@ ghc-options:
 - -flate-specialise
 - -fspecialise-aggressively
 default-extensions:
-- OverloadedStrings
+- BangPatterns
 - DataKinds
+- DeriveGeneric
 - FlexibleContexts
 - GADTs
 - LambdaCase
+- OverloadedStrings
 - PolyKinds
 - RankNTypes
-- ScopedTypeVariables
-- TypeApplications
-- TypeOperators
-- TypeFamilies
-- DeriveGeneric
 - RecordWildCards
+- ScopedTypeVariables
 - TemplateHaskell
-- BangPatterns
+- TypeApplications
+- TypeFamilies
+- TypeOperators
 
 library:
   source-dirs: src

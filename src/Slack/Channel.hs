@@ -19,6 +19,7 @@ import Data.Text (Text)
 import GHC.Generics (Generic)
 import Network.Wreq (defaults, param)
 import Polysemy (Final, Member, Sem)
+import Polysemy.View (View)
 import Slack.Util (NetCtx, fromJSON, slackGetPaginated, slackPost)
 import Prelude hiding (id)
 
@@ -39,31 +40,47 @@ instance FromJSON Channel where
     _topic <- topicObject .: "value"
     return Channel {..}
 
-findChannel :: Member (Final IO) r => NetCtx -> Text -> ExceptT Text (Sem r) (Maybe Channel)
-findChannel netCtx expectedName = do
+findChannel ::
+  ( Member (Final IO) r,
+    Member (View NetCtx) r
+  ) =>
+  Text ->
+  ExceptT Text (Sem r) (Maybe Channel)
+findChannel expectedName = do
   let params =
         defaults & param "types" .~ ["public_channel,private_channel"]
           & param "exclude_archived" .~ ["true"]
           & param "limit" .~ ["1000"]
-  respBodies <- slackGetPaginated netCtx params "conversations.list"
+  respBodies <- slackGetPaginated params "conversations.list"
   channels <-
     traverse fromJSON
       . concatMap (^.. values)
       =<< (traverse (^? key "channels") respBodies ?? "\"users.list\" response didn't include a \"channels\" field")
   return $ find (\x -> (x ^. name) == expectedName) channels
 
-createChannel :: Member (Final IO) r => NetCtx -> Text -> ExceptT Text (Sem r) Channel
-createChannel netCtx newName = do
+createChannel ::
+  ( Member (Final IO) r,
+    Member (View NetCtx) r
+  ) =>
+  Text ->
+  ExceptT Text (Sem r) Channel
+createChannel newName = do
   let params = ["name" .= newName]
-  respBody <- slackPost netCtx params "conversations.create"
+  respBody <- slackPost params "conversations.create"
   val <- (respBody ^? key "channel") ?? "\"conversations.create\" response didn't include a \"channel\" key"
   fromJSON val
 
-setChannelTopic :: Member (Final IO) r => NetCtx -> Text -> Text -> ExceptT Text (Sem r) ()
-setChannelTopic netCtx channelID newTopic = do
+setChannelTopic ::
+  ( Member (Final IO) r,
+    Member (View NetCtx) r
+  ) =>
+  Text ->
+  Text ->
+  ExceptT Text (Sem r) ()
+setChannelTopic channelID newTopic = do
   let params =
         [ "channel" .= channelID,
           "topic" .= newTopic
         ]
-  _ <- slackPost netCtx params "conversations.setTopic"
+  _ <- slackPost params "conversations.setTopic"
   return ()

@@ -22,6 +22,7 @@ import Data.Text as T (Text, null, pack)
 import Network.Wreq (Options, Response, asValue, auth, defaults, oauth2Bearer, param, responseBody)
 import Network.Wreq.Session (Session, getWith, postWith)
 import Polysemy (Final, Member, Sem, embedFinal)
+import Polysemy.View (View, see)
 import Prelude hiding (error)
 
 data NetCtx = NetCtx ByteString Session
@@ -29,35 +30,56 @@ data NetCtx = NetCtx ByteString Session
 slackURL :: String -> String
 slackURL = ("https://slack.com/api/" ++)
 
-slackGet :: Member (Final IO) r => NetCtx -> Options -> String -> ExceptT Text (Sem r) Value
-slackGet (NetCtx apiToken sess) opts method = do
+slackGet ::
+  ( Member (Final IO) r,
+    Member (View NetCtx) r
+  ) =>
+  Options ->
+  String ->
+  ExceptT Text (Sem r) Value
+slackGet opts method = do
+  (NetCtx apiToken sess) <- lift $ see @NetCtx
   let optsWithAuth = opts & auth ?~ oauth2Bearer apiToken
   let url = slackURL method
   resp <- lift $ embedFinal (asValue =<< getWith optsWithAuth sess url)
   hoistEither $ handleSlackError "GET" method resp
 
-slackGetPaginated :: Member (Final IO) r => NetCtx -> Options -> String -> ExceptT Text (Sem r) [Value]
-slackGetPaginated = slackGetPaginated' Nothing []
-
-slackGetPaginated' ::
-  Member (Final IO) r =>
-  Maybe Text ->
-  [Value] ->
-  NetCtx ->
+slackGetPaginated ::
+  ( Member (Final IO) r,
+    Member (View NetCtx) r
+  ) =>
   Options ->
   String ->
   ExceptT Text (Sem r) [Value]
-slackGetPaginated' cursor !acc netCtx opts method = do
+slackGetPaginated = slackGetPaginated' Nothing []
+
+slackGetPaginated' ::
+  ( Member (Final IO) r,
+    Member (View NetCtx) r
+  ) =>
+  Maybe Text ->
+  [Value] ->
+  Options ->
+  String ->
+  ExceptT Text (Sem r) [Value]
+slackGetPaginated' cursor !acc opts method = do
   let optsWithCursor = opts & param "cursor" .~ maybeToList cursor
-  respBody <- slackGet netCtx optsWithCursor method
+  respBody <- slackGet optsWithCursor method
   let nextCursor = mfilter (not . T.null) $ respBody ^? key "response_metadata" . key "next_cursor" . _String
   let nextAcc = respBody : acc
   case nextCursor of
-    Just _ -> slackGetPaginated' nextCursor nextAcc netCtx opts method
+    Just _ -> slackGetPaginated' nextCursor nextAcc opts method
     Nothing -> return $ reverse nextAcc
 
-slackPost :: Member (Final IO) r => NetCtx -> [Pair] -> String -> ExceptT Text (Sem r) Value
-slackPost (NetCtx apiToken sess) params method = do
+slackPost ::
+  ( Member (Final IO) r,
+    Member (View NetCtx) r
+  ) =>
+  [Pair] ->
+  String ->
+  ExceptT Text (Sem r) Value
+slackPost  params method = do
+  (NetCtx apiToken sess) <- lift $ see @NetCtx
   let optsWithAuth = defaults & auth ?~ oauth2Bearer apiToken
   let url = slackURL method
   let body = toJSON $ object params

@@ -1,6 +1,6 @@
 module Main where
 
-import Control.Monad.Trans.Except (ExceptT, runExceptT)
+import Control.Monad.Trans.Except (ExceptT)
 import Data.ByteString (ByteString)
 import Data.ByteString.Char8 as BS (pack)
 import Data.List (intercalate, isPrefixOf, partition)
@@ -8,8 +8,8 @@ import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Text.IO (getContents, readFile)
 import qualified Data.Text.IO as TIO (putStrLn)
-import Lib (dryRunEnsure, ensure, listUsers)
-import Polysemy (Final, Sem, runFinal)
+import Lib (CanonicalEffects, dryRunEnsure, ensure, listUsers, runCanonical)
+import Polysemy (Sem)
 import System.Environment (getArgs, lookupEnv)
 import System.Exit (exitFailure, exitSuccess)
 import Prelude hiding (getContents, readFile)
@@ -27,9 +27,9 @@ parse args
 parse ("ensure" : rest)
   | elem "-D" flags
       || elem "--dry-run" flags =
-    runDryRunEnsure =<< readInput input
+    (run . dryRunEnsure) =<< readInput input
   | not (null flags) = printFlags >> usage >> exitFailure
-  | otherwise = runEnsure =<< readInput input
+  | otherwise = (run . ensure) =<< readInput input
   where
     printFlags = putStrLn ("Unknown flags: " <> intercalate "," flags)
     (flags, input) = partition ("-" `isPrefixOf`) rest
@@ -38,7 +38,7 @@ parse args
   where
     flags = filter ("-" `isPrefixOf`) args
     printFlags = putStrLn ("Unknown flags: " <> intercalate "," flags)
-parse ["list-users"] = runListUsers
+parse ["list-users"] = run listUsers
 parse _ = usage >> exitFailure
 
 usage :: IO ()
@@ -48,29 +48,12 @@ usage =
     \                             ensure [file ..]\n\
     \                             ensure --dry-run [file ..]\n"
 
-runEnsure :: Text -> IO ()
-runEnsure inputText = getApiToken >>= (handleResult . ensure inputText)
+run :: ExceptT Text (Sem Lib.CanonicalEffects) Text -> IO ()
+run f = getApiToken >>= flip runCanonical f >>= logResult
 
-runDryRunEnsure :: Text -> IO ()
-runDryRunEnsure inputText = getApiToken >>= (handleResult . dryRunEnsure inputText)
-
-runListUsers :: IO ()
-runListUsers = getApiToken >>= (handleResult . listUsers)
-
-type CanonicalEffects =
-  '[ Final IO
-   ]
-
-runCanonical :: ExceptT Text (Sem CanonicalEffects) Text -> IO (Either Text Text)
-runCanonical =
-  runFinal
-    . runExceptT
-
-handleResult :: ExceptT Text (Sem CanonicalEffects) Text -> IO ()
-handleResult result = runCanonical result >>= logResult
-  where
-    logResult (Left message) = TIO.putStrLn message >> exitFailure
-    logResult (Right message) = TIO.putStrLn message >> exitSuccess
+logResult :: Either Text Text -> IO ()
+logResult (Left message) = TIO.putStrLn message >> exitFailure
+logResult (Right message) = TIO.putStrLn message >> exitSuccess
 
 getApiToken :: IO ByteString
 getApiToken =

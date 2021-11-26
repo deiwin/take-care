@@ -39,6 +39,7 @@ ghc-options:
 - -fspecialise-aggressively
 default-extensions:
 - BangPatterns
+- BlockArguments
 - DataKinds
 - DeriveGeneric
 - FlexibleContexts

@@ -18,6 +18,7 @@ import Data.Text as T (Text, null)
 import GHC.Generics (Generic)
 import Network.Wreq (defaults, param)
 import Polysemy (Final, Member, Sem)
+import Polysemy.View (View)
 import Slack.Util (NetCtx, fromJSON, slackGet, slackGetPaginated)
 import Prelude hiding (id)
 
@@ -41,16 +42,25 @@ instance FromJSON User where
     let _displayName = "@" <> fromMaybe name nonEmptyDisplayName
     return User {..}
 
-getUser :: Member (Final IO) r => NetCtx -> Text -> ExceptT Text (Sem r) User
-getUser netCtx userID = do
+getUser ::
+  ( Member (Final IO) r,
+    Member (View NetCtx) r
+  ) =>
+  Text ->
+  ExceptT Text (Sem r) User
+getUser userID = do
   let opts = defaults & param "user" .~ [userID]
-  respBody <- slackGet netCtx opts "users.info"
+  respBody <- slackGet opts "users.info"
   val <- (respBody ^? key "user") ?? "\"users.info\" response didn't include a \"user\" field"
   fromJSON val
 
-listAllUsers :: Member (Final IO) r => NetCtx -> ExceptT Text (Sem r) [User]
-listAllUsers netCtx = do
-  respBodies <- slackGetPaginated netCtx defaults "users.list"
+listAllUsers ::
+  ( Member (Final IO) r,
+    Member (View NetCtx) r
+  ) =>
+  ExceptT Text (Sem r) [User]
+listAllUsers = do
+  respBodies <- slackGetPaginated defaults "users.list"
   vals <-
     concatMap (^.. values)
       <$> (traverse (^? key "members") respBodies ?? "\"users.list\" response didn't include a \"members\" field")

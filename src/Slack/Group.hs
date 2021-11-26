@@ -22,6 +22,7 @@ import Data.Text (Text, unpack)
 import GHC.Generics (Generic)
 import Network.Wreq (defaults, param)
 import Polysemy (Final, Member, Sem)
+import Polysemy.View (View)
 import Slack.Util (NetCtx, fromJSON, slackGet, slackPost)
 import Prelude hiding (id)
 
@@ -42,49 +43,78 @@ instance FromJSON Group where
     _channelIDs <- prefs .: "channels"
     return Group {..}
 
-getGroupMembers :: Member (Final IO) r => NetCtx -> Text -> ExceptT Text (Sem r) [Text]
-getGroupMembers netCtx groupID = do
+getGroupMembers ::
+  ( Member (Final IO) r,
+    Member (View NetCtx) r
+  ) =>
+  Text ->
+  ExceptT Text (Sem r) [Text]
+getGroupMembers groupID = do
   let opts =
         defaults & param "usergroup" .~ [groupID]
           & param "include_disabled" .~ ["true"]
-  respBody <- slackGet netCtx opts "usergroups.users.list"
+  respBody <- slackGet opts "usergroups.users.list"
   return $ respBody ^.. key "users" . values . _String
 
-setGroupMembers :: Member (Final IO) r => NetCtx -> Text -> [Text] -> ExceptT Text (Sem r) ()
-setGroupMembers netCtx groupID userIDs = do
+setGroupMembers ::
+  ( Member (Final IO) r,
+    Member (View NetCtx) r
+  ) =>
+  Text ->
+  [Text] ->
+  ExceptT Text (Sem r) ()
+setGroupMembers groupID userIDs = do
   let params =
         [ "usergroup" .= groupID,
           "users" .= intercalate "," (unpack <$> userIDs)
         ]
-  _ <- slackPost netCtx params "usergroups.users.update"
+  _ <- slackPost params "usergroups.users.update"
   return ()
 
-setGroupChannels :: Member (Final IO) r => NetCtx -> Text -> [Text] -> ExceptT Text (Sem r) ()
-setGroupChannels netCtx groupID defaultChannelIDs = do
+setGroupChannels ::
+  ( Member (Final IO) r,
+    Member (View NetCtx) r
+  ) =>
+  Text ->
+  [Text] ->
+  ExceptT Text (Sem r) ()
+setGroupChannels groupID defaultChannelIDs = do
   let params =
         [ "usergroup" .= groupID,
           "channels" .= intercalate "," (unpack <$> defaultChannelIDs)
         ]
-  _ <- slackPost netCtx params "usergroups.update"
+  _ <- slackPost params "usergroups.update"
   return ()
 
-findGroup :: Member (Final IO) r => NetCtx -> Text -> ExceptT Text (Sem r) (Maybe Group)
-findGroup netCtx expectedHandle = do
+findGroup ::
+  ( Member (Final IO) r,
+    Member (View NetCtx) r
+  ) =>
+  Text ->
+  ExceptT Text (Sem r) (Maybe Group)
+findGroup expectedHandle = do
   let opts = defaults & param "include_disabled" .~ ["true"]
-  respBody <- slackGet netCtx opts "usergroups.list"
+  respBody <- slackGet opts "usergroups.list"
   groups <-
     traverse fromJSON
       . (^.. values)
       =<< ((respBody ^? key "usergroups") ?? "\"users.list\" response didn't include a \"channels\" field")
   return $ find (\x -> (x ^. handle) == expectedHandle) groups
 
-createGroup :: Member (Final IO) r => NetCtx -> Text -> Text -> [Text] -> ExceptT Text (Sem r) Group
-createGroup netCtx groupHandle groupName defaultChannelIDs = do
+createGroup ::
+  ( Member (Final IO) r,
+    Member (View NetCtx) r
+  ) =>
+  Text ->
+  Text ->
+  [Text] ->
+  ExceptT Text (Sem r) Group
+createGroup groupHandle groupName defaultChannelIDs = do
   let params =
         [ "handle" .= groupHandle,
           "name" .= groupName,
           "channels" .= intercalate "," (unpack <$> defaultChannelIDs)
         ]
-  respBody <- slackPost netCtx params "usergroups.create"
+  respBody <- slackPost params "usergroups.create"
   val <- (respBody ^? key "usergroup") ?? "\"usergroups.create\" response didn't include a \"usergroup\" key"
   fromJSON val

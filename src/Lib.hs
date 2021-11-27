@@ -40,20 +40,22 @@ import Slack.Channel as Channel
     topic,
   )
 import Slack.Group as Group
-  ( channelIDs,
-    createGroup,
-    findGroup,
-    getGroupMembers,
+  ( Groups,
+    channelIDs,
+    create,
+    find,
+    getMembers,
     id,
-    setGroupChannels,
-    setGroupMembers,
+    runGroups,
+    setChannels,
+    setMembers,
   )
 import Slack.User as User
-  ( displayName,
+  ( Users,
+    displayName,
     id,
-    Users,
     listAll,
-    runUsers
+    runUsers,
   )
 import Slack.Util (NetCtx, runNetCtx)
 import Text.Printf (printf)
@@ -67,6 +69,7 @@ newtype GetDisplayName = GetDisplayName
 type CanonicalEffects =
   '[ Channels,
      Users,
+     Groups,
      View NetCtx,
      Env,
      Error Text,
@@ -78,6 +81,7 @@ runCanonical :: Sem CanonicalEffects Text -> IO (Either Text Text)
 runCanonical =
   runChannels
     >>> runUsers
+    >>> runGroups
     >>> runNetCtx
     >>> runEnv
     >>> errorToIOFinal
@@ -86,10 +90,10 @@ runCanonical =
 
 ensure ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r,
     Member (Error Text) r,
     Member Channels r,
-    Member Users r
+    Member Users r,
+    Member Groups r
   ) =>
   Text ->
   Sem r Text
@@ -122,9 +126,9 @@ listUsers = do
 
 ensureTeamState ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r,
     Member (Error Text) r,
-    Member Channels r
+    Member Channels r,
+    Member Groups r
   ) =>
   GetDisplayName ->
   Team ->
@@ -161,26 +165,19 @@ findOrCreateChannel name = do
   current <- Channel.find name
   maybe (Channel.create name) return current
 
-ensureGroupState ::
-  ( Member (Final IO) r,
-    Member (View NetCtx) r,
-    Member (Error Text) r
-  ) =>
-  [Text] ->
-  Group ->
-  Sem r ()
+ensureGroupState :: Member Groups r => [Text] -> Group -> Sem r ()
 ensureGroupState defaultChannelIDs group = do
-  existingGroup <- findGroup $ handle group
+  existingGroup <- Group.find $ handle group
   slackGroup <- maybe createNew return existingGroup
   let groupID = slackGroup ^. Group.id
 
-  currentMembers <- Set.fromList <$> getGroupMembers groupID
-  unless (memberIDs group == currentMembers) $ setGroupMembers groupID $ Set.toList $ memberIDs group
+  currentMembers <- Set.fromList <$> Group.getMembers groupID
+  unless (memberIDs group == currentMembers) $ Group.setMembers groupID $ Set.toList $ memberIDs group
 
   let currentChannels = slackGroup ^. channelIDs
-  unless (same defaultChannelIDs currentChannels) $ setGroupChannels groupID defaultChannelIDs
+  unless (same defaultChannelIDs currentChannels) $ Group.setChannels groupID defaultChannelIDs
   where
-    createNew = createGroup (handle group) (description group) defaultChannelIDs
+    createNew = Group.create (handle group) (description group) defaultChannelIDs
     same a b = null (a \\ b) && null (b \\ a)
 
 getDisplayNameM :: Member Users r => Sem r GetDisplayName

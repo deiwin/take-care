@@ -1,13 +1,15 @@
 module Slack.Group
-  ( getGroupMembers,
-    setGroupMembers,
-    setGroupChannels,
-    findGroup,
-    createGroup,
-    Group,
+  ( Group,
     id,
     handle,
     channelIDs,
+    Groups,
+    runGroups,
+    getMembers,
+    setMembers,
+    setChannels,
+    find,
+    create,
   )
 where
 
@@ -15,11 +17,12 @@ import Control.Lens ((&), (.~), (^.), (^..), (^?))
 import Control.Lens.TH (makeLenses)
 import Data.Aeson (FromJSON (parseJSON), withObject, (.:), (.=))
 import Data.Aeson.Lens (key, values, _String)
-import Data.List (find, intercalate)
+import Data.List (intercalate)
+import qualified Data.List as L (find)
 import Data.Text (Text, unpack)
 import GHC.Generics (Generic)
 import Network.Wreq (defaults, param)
-import Polysemy (Final, Member, Sem)
+import Polysemy (Final, InterpreterFor, Member, Sem, interpret, makeSem)
 import Polysemy.Error (Error, note)
 import Polysemy.View (View)
 import Slack.Util (NetCtx, fromJSON, slackGet, slackPost)
@@ -41,6 +44,28 @@ instance FromJSON Group where
     prefs <- o .: "prefs"
     _channelIDs <- prefs .: "channels"
     return Group {..}
+
+data Groups m a where
+  GetMembers :: Text -> Groups m [Text]
+  SetMembers :: Text -> [Text] -> Groups m ()
+  SetChannels :: Text -> [Text] -> Groups m ()
+  Find :: Text -> Groups m (Maybe Group)
+  Create :: Text -> Text -> [Text] -> Groups m Group
+
+makeSem ''Groups
+
+runGroups ::
+  ( Member (Final IO) r,
+    Member (View NetCtx) r,
+    Member (Error Text) r
+  ) =>
+  InterpreterFor Groups r
+runGroups = interpret \case
+  GetMembers id -> getGroupMembers id
+  SetMembers groupID userIDs -> setGroupMembers groupID userIDs
+  SetChannels groupID defaultChannelIDs -> setGroupChannels groupID defaultChannelIDs
+  Find handle -> findGroup handle
+  Create handle name defaultChannelIDs -> createGroup handle name defaultChannelIDs
 
 getGroupMembers ::
   ( Member (Final IO) r,
@@ -102,7 +127,7 @@ findGroup expectedHandle = do
     traverse fromJSON
       . (^.. values)
       =<< ((respBody ^? key "usergroups") & note "\"users.list\" response didn't include a \"channels\" field")
-  return $ find (\x -> (x ^. handle) == expectedHandle) groups
+  return $ L.find (\x -> (x ^. handle) == expectedHandle) groups
 
 createGroup ::
   ( Member (Final IO) r,

@@ -31,10 +31,12 @@ import Polysemy.Error (Error, errorToIOFinal, note)
 import Polysemy.View (View (..))
 import Slack.Channel as Channel
   ( Channel,
-    createChannel,
-    findChannel,
+    Channels,
+    create,
+    find,
     id,
-    setChannelTopic,
+    runChannels,
+    setTopic,
     topic,
   )
 import Slack.Group as Group
@@ -57,7 +59,8 @@ newtype GetDisplayName = GetDisplayName
   }
 
 type CanonicalEffects =
-  '[ View NetCtx,
+  '[ Channels,
+     View NetCtx,
      Env,
      Error Text,
      Embed IO,
@@ -66,7 +69,8 @@ type CanonicalEffects =
 
 runCanonical :: Sem CanonicalEffects Text -> IO (Either Text Text)
 runCanonical =
-  runNetCtx
+  runChannels
+    >>> runNetCtx
     >>> runEnv
     >>> errorToIOFinal
     >>> embedToFinal @IO
@@ -75,7 +79,8 @@ runCanonical =
 ensure ::
   ( Member (Final IO) r,
     Member (View NetCtx) r,
-    Member (Error Text) r
+    Member (Error Text) r,
+    Member Channels r
   ) =>
   Text ->
   Sem r Text
@@ -114,7 +119,8 @@ listUsers = do
 ensureTeamState ::
   ( Member (Final IO) r,
     Member (View NetCtx) r,
-    Member (Error Text) r
+    Member (Error Text) r,
+    Member Channels r
   ) =>
   GetDisplayName ->
   Team ->
@@ -129,8 +135,8 @@ ensureTeamState getDisplayName record = do
 
 ensureChannelTopic ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r,
-    Member (Error Text) r
+    Member (Error Text) r,
+    Member Channels r
   ) =>
   GetDisplayName ->
   Channel ->
@@ -138,7 +144,7 @@ ensureChannelTopic ::
   Sem r ()
 ensureChannelTopic getDisplayName channel desiredTeamState = do
   newTopic <- topicGivenDisplayNames desiredTeamState (unGetDisplayName getDisplayName)
-  unless (same currentTopic newTopic) $ setChannelTopic channelID newTopic
+  unless (same currentTopic newTopic) $ setTopic channelID newTopic
   where
     channelID = channel ^. Channel.id
     currentTopic = channel ^. Channel.topic
@@ -147,15 +153,12 @@ ensureChannelTopic getDisplayName channel desiredTeamState = do
     potentialAddedChar c = c `elem` ['<', '>']
 
 findOrCreateChannel ::
-  ( Member (Final IO) r,
-    Member (View NetCtx) r,
-    Member (Error Text) r
-  ) =>
+  Member Channels r =>
   Text ->
   Sem r Channel
 findOrCreateChannel name = do
-  current <- findChannel name
-  maybe (createChannel name) return current
+  current <- Channel.find name
+  maybe (Channel.create name) return current
 
 ensureGroupState ::
   ( Member (Final IO) r,

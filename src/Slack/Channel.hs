@@ -1,10 +1,12 @@
 module Slack.Channel
-  ( findChannel,
-    createChannel,
-    setChannelTopic,
-    Channel,
+  ( Channel,
     id,
     topic,
+    Channels,
+    create,
+    find,
+    setTopic,
+    runChannels,
   )
 where
 
@@ -12,11 +14,11 @@ import Control.Lens ((&), (.~), (^.), (^..), (^?))
 import Control.Lens.TH (makeLenses)
 import Data.Aeson (FromJSON (parseJSON), withObject, (.:), (.=))
 import Data.Aeson.Lens (key, values)
-import Data.List as L (find)
+import qualified Data.List as L (find)
 import Data.Text (Text)
 import GHC.Generics (Generic)
 import Network.Wreq (defaults, param)
-import Polysemy (Final, Member, Sem)
+import Polysemy (Final, InterpreterFor, Member, Sem, interpret, makeSem)
 import Polysemy.Error (Error, note)
 import Polysemy.View (View)
 import Slack.Util (NetCtx, fromJSON, slackGetPaginated, slackPost)
@@ -39,6 +41,24 @@ instance FromJSON Channel where
     _topic <- topicObject .: "value"
     return Channel {..}
 
+data Channels m a where
+  Find :: Text -> Channels m (Maybe Channel)
+  Create :: Text -> Channels m Channel
+  SetTopic :: Text -> Text -> Channels m ()
+
+makeSem ''Channels
+
+runChannels ::
+  ( Member (Final IO) r,
+    Member (View NetCtx) r,
+    Member (Error Text) r
+  ) =>
+  InterpreterFor Channels r
+runChannels = interpret \case
+  Find name -> findChannel name
+  Create name -> createChannel name
+  SetTopic id topic -> setChannelTopic id topic
+
 findChannel ::
   ( Member (Final IO) r,
     Member (View NetCtx) r,
@@ -56,7 +76,7 @@ findChannel expectedName = do
     traverse fromJSON
       . concatMap (^.. values)
       =<< (traverse (^? key "channels") respBodies & note "\"users.list\" response didn't include a \"channels\" field")
-  return $ find (\x -> (x ^. name) == expectedName) channels
+  return $ L.find (\x -> (x ^. name) == expectedName) channels
 
 createChannel ::
   ( Member (Final IO) r,

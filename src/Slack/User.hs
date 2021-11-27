@@ -1,9 +1,11 @@
 module Slack.User
-  ( getUser,
-    listAllUsers,
-    User,
+  ( User,
     id,
     displayName,
+    Users,
+    get,
+    listAll,
+    runUsers,
   )
 where
 
@@ -15,7 +17,7 @@ import Data.Maybe (fromMaybe)
 import Data.Text as T (Text, null)
 import GHC.Generics (Generic)
 import Network.Wreq (defaults, param)
-import Polysemy (Final, Member, Sem)
+import Polysemy (Final, InterpreterFor, Member, Sem, interpret, makeSem)
 import Polysemy.Error (Error, note)
 import Polysemy.View (View)
 import Slack.Util (NetCtx, fromJSON, slackGet, slackGetPaginated)
@@ -40,6 +42,22 @@ instance FromJSON User where
 
     let _displayName = "@" <> fromMaybe name nonEmptyDisplayName
     return User {..}
+
+data Users m a where
+  Get :: Text -> Users m User
+  ListAll :: Users m [User]
+
+makeSem ''Users
+
+runUsers ::
+  ( Member (Final IO) r,
+    Member (View NetCtx) r,
+    Member (Error Text) r
+  ) =>
+  InterpreterFor Users r
+runUsers = interpret \case
+  Get id -> getUser id
+  ListAll -> listAllUsers
 
 getUser ::
   ( Member (Final IO) r,

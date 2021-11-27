@@ -48,7 +48,13 @@ import Slack.Group as Group
     setGroupChannels,
     setGroupMembers,
   )
-import Slack.User as User (displayName, id, listAllUsers)
+import Slack.User as User
+  ( displayName,
+    id,
+    Users,
+    listAll,
+    runUsers
+  )
 import Slack.Util (NetCtx, runNetCtx)
 import Text.Printf (printf)
 import Text.Show.Functions ()
@@ -60,6 +66,7 @@ newtype GetDisplayName = GetDisplayName
 
 type CanonicalEffects =
   '[ Channels,
+     Users,
      View NetCtx,
      Env,
      Error Text,
@@ -70,6 +77,7 @@ type CanonicalEffects =
 runCanonical :: Sem CanonicalEffects Text -> IO (Either Text Text)
 runCanonical =
   runChannels
+    >>> runUsers
     >>> runNetCtx
     >>> runEnv
     >>> errorToIOFinal
@@ -80,7 +88,8 @@ ensure ::
   ( Member (Final IO) r,
     Member (View NetCtx) r,
     Member (Error Text) r,
-    Member Channels r
+    Member Channels r,
+    Member Users r
   ) =>
   Text ->
   Sem r Text
@@ -94,8 +103,8 @@ ensure inputText = do
 
 dryRunEnsure ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r,
-    Member (Error Text) r
+    Member (Error Text) r,
+    Member Users r
   ) =>
   Text ->
   Sem r Text
@@ -105,14 +114,9 @@ dryRunEnsure inputText = do
   getDisplayName <- getDisplayNameM
   showDesiredTeamStateList (unGetDisplayName getDisplayName) desiredStateList
 
-listUsers ::
-  ( Member (Final IO) r,
-    Member (View NetCtx) r,
-    Member (Error Text) r
-  ) =>
-  Sem r Text
+listUsers :: Member Users r => Sem r Text
 listUsers = do
-  unlines . fmap formatLine <$> listAllUsers
+  unlines . fmap formatLine <$> User.listAll
   where
     formatLine user = pack $ printf "%s: %s" (user ^. User.id) (user ^. displayName)
 
@@ -152,10 +156,7 @@ ensureChannelTopic getDisplayName channel desiredTeamState = do
     clean = filter (not . potentialAddedChar)
     potentialAddedChar c = c `elem` ['<', '>']
 
-findOrCreateChannel ::
-  Member Channels r =>
-  Text ->
-  Sem r Channel
+findOrCreateChannel :: Member Channels r => Text -> Sem r Channel
 findOrCreateChannel name = do
   current <- Channel.find name
   maybe (Channel.create name) return current
@@ -182,14 +183,9 @@ ensureGroupState defaultChannelIDs group = do
     createNew = createGroup (handle group) (description group) defaultChannelIDs
     same a b = null (a \\ b) && null (b \\ a)
 
-getDisplayNameM ::
-  ( Member (Final IO) r,
-    Member (View NetCtx) r,
-    Member (Error Text) r
-  ) =>
-  Sem r GetDisplayName
+getDisplayNameM :: Member Users r => Sem r GetDisplayName
 getDisplayNameM = do
-  map <- Map.fromList . fmap toPair <$> listAllUsers
+  map <- Map.fromList . fmap toPair <$> User.listAll
   return $ GetDisplayName $ lookup map
   where
     lookup map id = Map.lookup id map & note (pack (printf "Could not find user with ID: %s" id))

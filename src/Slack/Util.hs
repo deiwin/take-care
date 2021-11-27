@@ -8,11 +8,8 @@ module Slack.Util
   )
 where
 
-import Control.Error.Util (hoistEither)
 import Control.Lens ((&), (.~), (?~), (^.), (^?), (^?!))
 import Control.Monad (mfilter)
-import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Except (ExceptT)
 import Data.Aeson (FromJSON, Value, object, toJSON)
 import qualified Data.Aeson as A (fromJSON)
 import Data.Aeson.Lens (key, _Bool, _String)
@@ -25,9 +22,10 @@ import IO (Env, lookup)
 import Network.Wreq (Options, Response, asValue, auth, defaults, oauth2Bearer, param, responseBody)
 import Network.Wreq.Session (Session, getWith, newAPISession, postWith)
 import Polysemy (Embed, Final, InterpreterFor, Member, Sem, embed, embedFinal, interpret)
-import Polysemy.Error (Error, note)
+import Polysemy.Error (Error, note, throw)
 import Polysemy.View (View (..), see)
-import Prelude hiding (error, lookup)
+import Prelude hiding (lookup)
+import Control.Category ((>>>))
 
 data NetCtx = NetCtx ByteString Session
 
@@ -48,36 +46,39 @@ slackURL = ("https://slack.com/api/" ++)
 
 slackGet ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r
+    Member (View NetCtx) r,
+    Member (Error Text) r
   ) =>
   Options ->
   String ->
-  ExceptT Text (Sem r) Value
+  Sem r Value
 slackGet opts method = do
-  (NetCtx apiToken sess) <- lift $ see @NetCtx
+  (NetCtx apiToken sess) <- see @NetCtx
   let optsWithAuth = opts & auth ?~ oauth2Bearer apiToken
   let url = slackURL method
-  resp <- lift $ embedFinal (asValue =<< getWith optsWithAuth sess url)
-  hoistEither $ handleSlackError "GET" method resp
+  resp <- embedFinal (asValue =<< getWith optsWithAuth sess url)
+  handleSlackError "GET" method resp
 
 slackGetPaginated ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r
+    Member (View NetCtx) r,
+    Member (Error Text) r
   ) =>
   Options ->
   String ->
-  ExceptT Text (Sem r) [Value]
+  Sem r [Value]
 slackGetPaginated = slackGetPaginated' Nothing []
 
 slackGetPaginated' ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r
+    Member (View NetCtx) r,
+    Member (Error Text) r
   ) =>
   Maybe Text ->
   [Value] ->
   Options ->
   String ->
-  ExceptT Text (Sem r) [Value]
+  Sem r [Value]
 slackGetPaginated' cursor !acc opts method = do
   let optsWithCursor = opts & param "cursor" .~ maybeToList cursor
   respBody <- slackGet optsWithCursor method
@@ -89,32 +90,42 @@ slackGetPaginated' cursor !acc opts method = do
 
 slackPost ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r
+    Member (View NetCtx) r,
+    Member (Error Text) r
   ) =>
   [Pair] ->
   String ->
-  ExceptT Text (Sem r) Value
+  Sem r Value
 slackPost params method = do
-  (NetCtx apiToken sess) <- lift $ see @NetCtx
+  (NetCtx apiToken sess) <- see @NetCtx
   let optsWithAuth = defaults & auth ?~ oauth2Bearer apiToken
   let url = slackURL method
   let body = toJSON $ object params
-  resp <- lift $ embedFinal $ asValue =<< postWith optsWithAuth sess url body
-  hoistEither $ handleSlackError "POST" method resp
+  resp <- embedFinal $ asValue =<< postWith optsWithAuth sess url body
+  handleSlackError "POST" method resp
 
-handleSlackError :: Text -> String -> Response Value -> Either Text Value
+handleSlackError ::
+  Member (Error Text) r =>
+  Text ->
+  String ->
+  Response Value ->
+  Sem r Value
 handleSlackError httpMethod method resp =
   let respBody = resp ^. responseBody
       ok = respBody ^?! key "ok" . _Bool
-      error = respBody ^. key "error" . _String
+      errorMessage = respBody ^. key "error" . _String
       detail = respBody ^? key "detail" . _String
    in if ok
-        then Right respBody
-        else Left (httpMethod <> " " <> T.pack method <> ": " <> error <> maybe "" (" - " <>) detail)
+        then return respBody
+        else throw (httpMethod <> " " <> T.pack method <> ": " <> errorMessage <> maybe "" (" - " <>) detail)
 
-fromJSON :: (FromJSON a, Monad m) => Value -> ExceptT Text m a
-fromJSON = hoistEither . hoistResult . A.fromJSON
-  where
-    hoistResult res = case res of
-      Error e -> Left $ pack e
-      Success o -> Right o
+fromJSON ::
+  ( FromJSON a,
+    Member (Error Text) r
+  ) =>
+  Value ->
+  Sem r a
+fromJSON =
+  A.fromJSON >>> \case
+    Error e -> throw $ pack e
+    Success o -> return o

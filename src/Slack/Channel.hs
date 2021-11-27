@@ -8,10 +8,8 @@ module Slack.Channel
   )
 where
 
-import Control.Error.Util ((??))
 import Control.Lens ((&), (.~), (^.), (^..), (^?))
 import Control.Lens.TH (makeLenses)
-import Control.Monad.Trans.Except (ExceptT)
 import Data.Aeson (FromJSON (parseJSON), withObject, (.:), (.=))
 import Data.Aeson.Lens (key, values)
 import Data.List as L (find)
@@ -19,6 +17,7 @@ import Data.Text (Text)
 import GHC.Generics (Generic)
 import Network.Wreq (defaults, param)
 import Polysemy (Final, Member, Sem)
+import Polysemy.Error (Error, note)
 import Polysemy.View (View)
 import Slack.Util (NetCtx, fromJSON, slackGetPaginated, slackPost)
 import Prelude hiding (id)
@@ -42,10 +41,11 @@ instance FromJSON Channel where
 
 findChannel ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r
+    Member (View NetCtx) r,
+    Member (Error Text) r
   ) =>
   Text ->
-  ExceptT Text (Sem r) (Maybe Channel)
+  Sem r (Maybe Channel)
 findChannel expectedName = do
   let params =
         defaults & param "types" .~ ["public_channel,private_channel"]
@@ -55,28 +55,30 @@ findChannel expectedName = do
   channels <-
     traverse fromJSON
       . concatMap (^.. values)
-      =<< (traverse (^? key "channels") respBodies ?? "\"users.list\" response didn't include a \"channels\" field")
+      =<< (traverse (^? key "channels") respBodies & note "\"users.list\" response didn't include a \"channels\" field")
   return $ find (\x -> (x ^. name) == expectedName) channels
 
 createChannel ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r
+    Member (View NetCtx) r,
+    Member (Error Text) r
   ) =>
   Text ->
-  ExceptT Text (Sem r) Channel
+  Sem r Channel
 createChannel newName = do
   let params = ["name" .= newName]
   respBody <- slackPost params "conversations.create"
-  val <- (respBody ^? key "channel") ?? "\"conversations.create\" response didn't include a \"channel\" key"
+  val <- (respBody ^? key "channel") & note "\"conversations.create\" response didn't include a \"channel\" key"
   fromJSON val
 
 setChannelTopic ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r
+    Member (View NetCtx) r,
+    Member (Error Text) r
   ) =>
   Text ->
   Text ->
-  ExceptT Text (Sem r) ()
+  Sem r ()
 setChannelTopic channelID newTopic = do
   let params =
         [ "channel" .= channelID,

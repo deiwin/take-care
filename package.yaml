@@ -61,12 +61,10 @@ library:
   - aeson
   - bytestring
   - dhall
-  - errors
   - lens
   - lens-aeson
   - text
   - time
-  - transformers
   - wreq
   - containers
 
@@ -82,7 +80,6 @@ executables:
     - bytestring
     - take-care
     - text
-    - transformers
 
 tests:
   take-care-test:

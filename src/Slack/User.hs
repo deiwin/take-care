@@ -7,10 +7,8 @@ module Slack.User
   )
 where
 
-import Control.Error.Util ((??))
 import Control.Lens ((&), (.~), (^..), (^?))
 import Control.Lens.TH (makeLenses)
-import Control.Monad.Trans.Except (ExceptT)
 import Data.Aeson (FromJSON (parseJSON), withObject, (.:), (.:?))
 import Data.Aeson.Lens (key, values)
 import Data.Maybe (fromMaybe)
@@ -18,6 +16,7 @@ import Data.Text as T (Text, null)
 import GHC.Generics (Generic)
 import Network.Wreq (defaults, param)
 import Polysemy (Final, Member, Sem)
+import Polysemy.Error (Error, note)
 import Polysemy.View (View)
 import Slack.Util (NetCtx, fromJSON, slackGet, slackGetPaginated)
 import Prelude hiding (id)
@@ -44,24 +43,26 @@ instance FromJSON User where
 
 getUser ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r
+    Member (View NetCtx) r,
+    Member (Error Text) r
   ) =>
   Text ->
-  ExceptT Text (Sem r) User
+  Sem r User
 getUser userID = do
   let opts = defaults & param "user" .~ [userID]
   respBody <- slackGet opts "users.info"
-  val <- (respBody ^? key "user") ?? "\"users.info\" response didn't include a \"user\" field"
+  val <- (respBody ^? key "user") & note "\"users.info\" response didn't include a \"user\" field"
   fromJSON val
 
 listAllUsers ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r
+    Member (View NetCtx) r,
+    Member (Error Text) r
   ) =>
-  ExceptT Text (Sem r) [User]
+  Sem r [User]
 listAllUsers = do
   respBodies <- slackGetPaginated defaults "users.list"
   vals <-
     concatMap (^.. values)
-      <$> (traverse (^? key "members") respBodies ?? "\"users.list\" response didn't include a \"members\" field")
+      <$> (traverse (^? key "members") respBodies & note "\"users.list\" response didn't include a \"members\" field")
   traverse fromJSON vals

@@ -11,10 +11,8 @@ module Slack.Group
   )
 where
 
-import Control.Error.Util ((??))
 import Control.Lens ((&), (.~), (^.), (^..), (^?))
 import Control.Lens.TH (makeLenses)
-import Control.Monad.Trans.Except (ExceptT)
 import Data.Aeson (FromJSON (parseJSON), withObject, (.:), (.=))
 import Data.Aeson.Lens (key, values, _String)
 import Data.List (find, intercalate)
@@ -22,6 +20,7 @@ import Data.Text (Text, unpack)
 import GHC.Generics (Generic)
 import Network.Wreq (defaults, param)
 import Polysemy (Final, Member, Sem)
+import Polysemy.Error (Error, note)
 import Polysemy.View (View)
 import Slack.Util (NetCtx, fromJSON, slackGet, slackPost)
 import Prelude hiding (id)
@@ -45,10 +44,11 @@ instance FromJSON Group where
 
 getGroupMembers ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r
+    Member (View NetCtx) r,
+    Member (Error Text) r
   ) =>
   Text ->
-  ExceptT Text (Sem r) [Text]
+  Sem r [Text]
 getGroupMembers groupID = do
   let opts =
         defaults & param "usergroup" .~ [groupID]
@@ -58,11 +58,12 @@ getGroupMembers groupID = do
 
 setGroupMembers ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r
+    Member (View NetCtx) r,
+    Member (Error Text) r
   ) =>
   Text ->
   [Text] ->
-  ExceptT Text (Sem r) ()
+  Sem r ()
 setGroupMembers groupID userIDs = do
   let params =
         [ "usergroup" .= groupID,
@@ -73,11 +74,12 @@ setGroupMembers groupID userIDs = do
 
 setGroupChannels ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r
+    Member (View NetCtx) r,
+    Member (Error Text) r
   ) =>
   Text ->
   [Text] ->
-  ExceptT Text (Sem r) ()
+  Sem r ()
 setGroupChannels groupID defaultChannelIDs = do
   let params =
         [ "usergroup" .= groupID,
@@ -88,27 +90,29 @@ setGroupChannels groupID defaultChannelIDs = do
 
 findGroup ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r
+    Member (View NetCtx) r,
+    Member (Error Text) r
   ) =>
   Text ->
-  ExceptT Text (Sem r) (Maybe Group)
+  Sem r (Maybe Group)
 findGroup expectedHandle = do
   let opts = defaults & param "include_disabled" .~ ["true"]
   respBody <- slackGet opts "usergroups.list"
   groups <-
     traverse fromJSON
       . (^.. values)
-      =<< ((respBody ^? key "usergroups") ?? "\"users.list\" response didn't include a \"channels\" field")
+      =<< ((respBody ^? key "usergroups") & note "\"users.list\" response didn't include a \"channels\" field")
   return $ find (\x -> (x ^. handle) == expectedHandle) groups
 
 createGroup ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r
+    Member (View NetCtx) r,
+    Member (Error Text) r
   ) =>
   Text ->
   Text ->
   [Text] ->
-  ExceptT Text (Sem r) Group
+  Sem r Group
 createGroup groupHandle groupName defaultChannelIDs = do
   let params =
         [ "handle" .= groupHandle,
@@ -116,5 +120,5 @@ createGroup groupHandle groupName defaultChannelIDs = do
           "channels" .= intercalate "," (unpack <$> defaultChannelIDs)
         ]
   respBody <- slackPost params "usergroups.create"
-  val <- (respBody ^? key "usergroup") ?? "\"usergroups.create\" response didn't include a \"usergroup\" key"
+  val <- (respBody ^? key "usergroup") & note "\"usergroups.create\" response didn't include a \"usergroup\" key"
   fromJSON val

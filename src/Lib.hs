@@ -16,20 +16,18 @@ import Config
     showDesiredTeamStateList,
   )
 import Control.Category ((>>>))
-import Control.Error.Util ((??))
 import Control.Lens ((^.))
-import Control.Monad (join, unless)
-import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Except (ExceptT, runExceptT)
+import Control.Monad (unless)
 import Data.Foldable (traverse_)
+import Data.Function ((&))
 import Data.List ((\\))
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Data.Text (Text, filter, pack, unlines)
 import Data.Time.Clock (getCurrentTime)
 import IO (Env, runEnv)
-import Polysemy (Embed, Final, Member, Sem, embedFinal, embedToFinal, runFinal)
-import Polysemy.Error (Error, errorToIOFinal)
+import Polysemy (Embed, Final, Member, Members, Sem, embedFinal, embedToFinal, runFinal)
+import Polysemy.Error (Error, errorToIOFinal, note)
 import Polysemy.View (View (..))
 import Slack.Channel as Channel
   ( Channel,
@@ -52,10 +50,10 @@ import Slack.User as User (displayName, id, listAllUsers)
 import Slack.Util (NetCtx, runNetCtx)
 import Text.Printf (printf)
 import Text.Show.Functions ()
-import Prelude hiding (filter, lookup, unlines)
+import Prelude hiding (filter, unlines)
 
 newtype GetDisplayName = GetDisplayName
-  { unGetDisplayName :: forall r. Member (Final IO) r => Text -> ExceptT Text (Sem r) Text
+  { unGetDisplayName :: forall r. Members '[Final IO, Error Text] r => Text -> Sem r Text
   }
 
 type CanonicalEffects =
@@ -66,24 +64,23 @@ type CanonicalEffects =
      Final IO
    ]
 
-runCanonical :: ExceptT Text (Sem CanonicalEffects) Text -> IO (Either Text Text)
+runCanonical :: Sem CanonicalEffects Text -> IO (Either Text Text)
 runCanonical =
-  runExceptT
-    >>> runNetCtx
+  runNetCtx
     >>> runEnv
     >>> errorToIOFinal
-    >>> fmap join
     >>> embedToFinal @IO
     >>> runFinal
 
 ensure ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r
+    Member (View NetCtx) r,
+    Member (Error Text) r
   ) =>
   Text ->
-  ExceptT Text (Sem r) Text
+  Sem r Text
 ensure inputText = do
-  records <- lift $ embedFinal $ parseTeamList inputText
+  records <- embedFinal $ parseTeamList inputText
   getDisplayName <- getDisplayNameM
   teamResults <- traverse (wrapTeamResult $ ensureTeamState getDisplayName) records
   return $ unlines teamResults
@@ -92,21 +89,23 @@ ensure inputText = do
 
 dryRunEnsure ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r
+    Member (View NetCtx) r,
+    Member (Error Text) r
   ) =>
   Text ->
-  ExceptT Text (Sem r) Text
+  Sem r Text
 dryRunEnsure inputText = do
-  time <- lift $ embedFinal getCurrentTime
-  desiredStateList <- lift $ embedFinal $ currentDesiredTeamState time <<$>> parseTeamList inputText
+  time <- embedFinal getCurrentTime
+  desiredStateList <- embedFinal $ currentDesiredTeamState time <<$>> parseTeamList inputText
   getDisplayName <- getDisplayNameM
   showDesiredTeamStateList (unGetDisplayName getDisplayName) desiredStateList
 
 listUsers ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r
+    Member (View NetCtx) r,
+    Member (Error Text) r
   ) =>
-  ExceptT Text (Sem r) Text
+  Sem r Text
 listUsers = do
   unlines . fmap formatLine <$> listAllUsers
   where
@@ -114,13 +113,14 @@ listUsers = do
 
 ensureTeamState ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r
+    Member (View NetCtx) r,
+    Member (Error Text) r
   ) =>
   GetDisplayName ->
   Team ->
-  ExceptT Text (Sem r) ()
+  Sem r ()
 ensureTeamState getDisplayName record = do
-  time <- lift $ embedFinal getCurrentTime
+  time <- embedFinal getCurrentTime
   let desiredTeamState = currentDesiredTeamState time record
   channel <- findOrCreateChannel $ teamChannelName desiredTeamState
   ensureChannelTopic getDisplayName channel desiredTeamState
@@ -129,12 +129,13 @@ ensureTeamState getDisplayName record = do
 
 ensureChannelTopic ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r
+    Member (View NetCtx) r,
+    Member (Error Text) r
   ) =>
   GetDisplayName ->
   Channel ->
   DesiredTeamState ->
-  ExceptT Text (Sem r) ()
+  Sem r ()
 ensureChannelTopic getDisplayName channel desiredTeamState = do
   newTopic <- topicGivenDisplayNames desiredTeamState (unGetDisplayName getDisplayName)
   unless (same currentTopic newTopic) $ setChannelTopic channelID newTopic
@@ -147,21 +148,23 @@ ensureChannelTopic getDisplayName channel desiredTeamState = do
 
 findOrCreateChannel ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r
+    Member (View NetCtx) r,
+    Member (Error Text) r
   ) =>
   Text ->
-  ExceptT Text (Sem r) Channel
+  Sem r Channel
 findOrCreateChannel name = do
   current <- findChannel name
   maybe (createChannel name) return current
 
 ensureGroupState ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r
+    Member (View NetCtx) r,
+    Member (Error Text) r
   ) =>
   [Text] ->
   Group ->
-  ExceptT Text (Sem r) ()
+  Sem r ()
 ensureGroupState defaultChannelIDs group = do
   existingGroup <- findGroup $ handle group
   slackGroup <- maybe createNew return existingGroup
@@ -178,14 +181,15 @@ ensureGroupState defaultChannelIDs group = do
 
 getDisplayNameM ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r
+    Member (View NetCtx) r,
+    Member (Error Text) r
   ) =>
-  ExceptT Text (Sem r) GetDisplayName
+  Sem r GetDisplayName
 getDisplayNameM = do
   map <- Map.fromList . fmap toPair <$> listAllUsers
   return $ GetDisplayName $ lookup map
   where
-    lookup map id = Map.lookup id map ?? pack (printf "Could not find user with ID: %s" id)
+    lookup map id = Map.lookup id map & note (pack (printf "Could not find user with ID: %s" id))
     toPair user = (user ^. User.id, user ^. displayName)
 
 infixl 4 <<$>>

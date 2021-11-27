@@ -1,7 +1,6 @@
 module Main where
 
 import Control.Monad ((>=>))
-import Control.Monad.Trans.Except (ExceptT)
 import Data.List (intercalate, isPrefixOf, partition)
 import Data.Text (Text)
 import Data.Text.IO (getContents, readFile)
@@ -46,7 +45,7 @@ usage =
     \                             ensure [file ..]\n\
     \                             ensure --dry-run [file ..]\n"
 
-run :: ExceptT Text (Sem Lib.CanonicalEffects) Text -> IO ()
+run :: Sem Lib.CanonicalEffects Text -> IO ()
 run = runCanonical >=> logResult
 
 logResult :: Either Text Text -> IO ()

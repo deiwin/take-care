@@ -1,16 +1,14 @@
 module Main where
 
+import Control.Monad ((>=>))
 import Control.Monad.Trans.Except (ExceptT)
-import Data.ByteString (ByteString)
-import Data.ByteString.Char8 as BS (pack)
 import Data.List (intercalate, isPrefixOf, partition)
-import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Data.Text.IO (getContents, readFile)
 import qualified Data.Text.IO as TIO (putStrLn)
 import Lib (CanonicalEffects, dryRunEnsure, ensure, listUsers, runCanonical)
 import Polysemy (Sem)
-import System.Environment (getArgs, lookupEnv)
+import System.Environment (getArgs)
 import System.Exit (exitFailure, exitSuccess)
 import Prelude hiding (getContents, readFile)
 
@@ -49,16 +47,11 @@ usage =
     \                             ensure --dry-run [file ..]\n"
 
 run :: ExceptT Text (Sem Lib.CanonicalEffects) Text -> IO ()
-run f = getApiToken >>= flip runCanonical f >>= logResult
+run = runCanonical >=> logResult
 
 logResult :: Either Text Text -> IO ()
 logResult (Left message) = TIO.putStrLn message >> exitFailure
 logResult (Right message) = TIO.putStrLn message >> exitSuccess
-
-getApiToken :: IO ByteString
-getApiToken =
-  BS.pack . fromMaybe (error "API_TOKEN env variable not set")
-    <$> lookupEnv "API_TOKEN"
 
 readInput :: [String] -> IO Text
 readInput [] = getContents

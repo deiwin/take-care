@@ -22,6 +22,7 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (ExceptT, runExceptT)
 import Data.ByteString (ByteString)
 import Data.Foldable (traverse_)
+import Data.Function ((&))
 import Data.List ((\\))
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -74,11 +75,11 @@ runNetCtx token program = do
 
 runCanonical :: ByteString -> ExceptT Text (Sem CanonicalEffects) Text -> IO (Either Text Text)
 runCanonical token program = do
-  runFinal
-    . embedToFinal @IO
-    . runNetCtx token
-    . runExceptT
-    $ program
+  program
+    & runExceptT
+    & runNetCtx token
+    & embedToFinal @IO
+    & runFinal
 
 ensure ::
   ( Member (Final IO) r,

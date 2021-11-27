@@ -21,16 +21,15 @@ import Control.Lens ((^.))
 import Control.Monad (join, unless)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (ExceptT, runExceptT)
-import qualified Data.ByteString.Char8 as BS (pack)
 import Data.Foldable (traverse_)
 import Data.List ((\\))
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Data.Text (Text, filter, pack, unlines)
 import Data.Time.Clock (getCurrentTime)
-import Network.Wreq.Session (newAPISession)
-import Polysemy (Embed, Final, Member, Sem, embed, embedFinal, embedToFinal, interpret, runFinal)
-import Polysemy.Error (Error, errorToIOFinal, note)
+import IO (Env, runEnv)
+import Polysemy (Embed, Final, Member, Sem, embedFinal, embedToFinal, runFinal)
+import Polysemy.Error (Error, errorToIOFinal)
 import Polysemy.View (View (..))
 import Slack.Channel as Channel
   ( Channel,
@@ -50,11 +49,10 @@ import Slack.Group as Group
     setGroupMembers,
   )
 import Slack.User as User (displayName, id, listAllUsers)
-import Slack.Util (NetCtx (..))
-import System.Environment (lookupEnv)
+import Slack.Util (NetCtx, runNetCtx)
 import Text.Printf (printf)
 import Text.Show.Functions ()
-import Prelude hiding (filter, unlines)
+import Prelude hiding (filter, lookup, unlines)
 
 newtype GetDisplayName = GetDisplayName
   { unGetDisplayName :: forall r. Member (Final IO) r => Text -> ExceptT Text (Sem r) Text
@@ -62,27 +60,17 @@ newtype GetDisplayName = GetDisplayName
 
 type CanonicalEffects =
   '[ View NetCtx,
+     Env,
      Error Text,
      Embed IO,
      Final IO
    ]
 
-runNetCtx ::
-  ( Member (Embed IO) r,
-    Member (Error Text) r
-  ) =>
-  Sem (View NetCtx ': r) a ->
-  Sem r a
-runNetCtx program = do
-  session <- embed newAPISession
-  tokenM <- embed $ lookupEnv "API_TOKEN"
-  token <- BS.pack <$> note "API_TOKEN env variable not set" tokenM
-  interpret (\case See -> return (NetCtx token session)) program
-
 runCanonical :: ExceptT Text (Sem CanonicalEffects) Text -> IO (Either Text Text)
 runCanonical =
   runExceptT
     >>> runNetCtx
+    >>> runEnv
     >>> errorToIOFinal
     >>> fmap join
     >>> embedToFinal @IO

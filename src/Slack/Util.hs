@@ -4,6 +4,7 @@ module Slack.Util
     slackPost,
     fromJSON,
     NetCtx (..),
+    runNetCtx,
   )
 where
 
@@ -17,15 +18,30 @@ import qualified Data.Aeson as A (fromJSON)
 import Data.Aeson.Lens (key, _Bool, _String)
 import Data.Aeson.Types (Pair, Result (Error, Success))
 import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as BS (pack)
 import Data.Maybe (maybeToList)
 import Data.Text as T (Text, null, pack)
+import IO (Env, lookup)
 import Network.Wreq (Options, Response, asValue, auth, defaults, oauth2Bearer, param, responseBody)
-import Network.Wreq.Session (Session, getWith, postWith)
-import Polysemy (Final, Member, Sem, embedFinal)
-import Polysemy.View (View, see)
-import Prelude hiding (error)
+import Network.Wreq.Session (Session, getWith, newAPISession, postWith)
+import Polysemy (Embed, Final, InterpreterFor, Member, Sem, embed, embedFinal, interpret)
+import Polysemy.Error (Error, note)
+import Polysemy.View (View (..), see)
+import Prelude hiding (error, lookup)
 
 data NetCtx = NetCtx ByteString Session
+
+runNetCtx ::
+  ( Member (Embed IO) r,
+    Member Env r,
+    Member (Error Text) r
+  ) =>
+  InterpreterFor (View NetCtx) r
+runNetCtx program = do
+  session <- embed newAPISession
+  tokenM <- lookup "API_TOKEN"
+  token <- BS.pack <$> note "API_TOKEN env variable not set" tokenM
+  interpret (\case See -> return (NetCtx token session)) program
 
 slackURL :: String -> String
 slackURL = ("https://slack.com/api/" ++)
@@ -78,7 +94,7 @@ slackPost ::
   [Pair] ->
   String ->
   ExceptT Text (Sem r) Value
-slackPost  params method = do
+slackPost params method = do
   (NetCtx apiToken sess) <- lift $ see @NetCtx
   let optsWithAuth = defaults & auth ?~ oauth2Bearer apiToken
   let url = slackURL method

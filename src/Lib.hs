@@ -15,6 +15,7 @@ import Config
     parseTeamList,
     showDesiredTeamStateList,
   )
+import Control.Category ((>>>))
 import Control.Error.Util ((??))
 import Control.Lens ((^.))
 import Control.Monad (join, unless)
@@ -22,7 +23,6 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (ExceptT, runExceptT)
 import qualified Data.ByteString.Char8 as BS (pack)
 import Data.Foldable (traverse_)
-import Data.Function ((&))
 import Data.List ((\\))
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -77,21 +77,16 @@ runNetCtx program = do
   session <- embed newAPISession
   tokenM <- embed $ lookupEnv "API_TOKEN"
   token <- BS.pack <$> note "API_TOKEN env variable not set" tokenM
-  interpret
-    ( \case
-        See -> return (NetCtx token session)
-    )
-    program
+  interpret (\case See -> return (NetCtx token session)) program
 
 runCanonical :: ExceptT Text (Sem CanonicalEffects) Text -> IO (Either Text Text)
-runCanonical program = do
-  program
-    & runExceptT
-    & runNetCtx
-    & errorToIOFinal
-    & fmap join
-    & embedToFinal @IO
-    & runFinal
+runCanonical =
+  runExceptT
+    >>> runNetCtx
+    >>> errorToIOFinal
+    >>> fmap join
+    >>> embedToFinal @IO
+    >>> runFinal
 
 ensure ::
   ( Member (Final IO) r,

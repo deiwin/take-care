@@ -3,10 +3,14 @@ module Config
     Team (..),
     Group (..),
     DesiredTeamState (..),
-    parseTeamList,
     currentGroups,
     currentDesiredTeamState,
     showDesiredTeamStateList,
+
+    -- * Effect
+    Config,
+    runConfig,
+    parse,
   )
 where
 
@@ -18,6 +22,7 @@ import Data.Time.Clock (UTCTime (..))
 import Dhall (FromDhall)
 import qualified Dhall (auto, input)
 import GHC.Generics (Generic)
+import Polysemy (Embed, InterpreterFor, Member, embed, interpret, makeSem)
 import Text.Printf (printf)
 import Prelude hiding (lines, replicate)
 
@@ -52,8 +57,14 @@ data DesiredTeamState = DesiredTeamState
     topicGivenDisplayNames :: forall m. (Monad m) => (Text -> m Text) -> m Text
   }
 
-parseTeamList :: Text -> IO [Team]
-parseTeamList = Dhall.input Dhall.auto
+data Config m a where
+  Parse :: Text -> Config m [Team]
+
+makeSem ''Config
+
+runConfig :: Member (Embed IO) r => InterpreterFor Config r
+runConfig = interpret \case
+  Parse input -> embed $ Dhall.input Dhall.auto input
 
 currentGroups :: UTCTime -> [Team] -> [Group]
 currentGroups time teams = concat (groupList . currentDesiredTeamState time <$> teams)

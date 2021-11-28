@@ -8,13 +8,15 @@ module Lib
 where
 
 import Config
-  ( DesiredTeamState (..),
+  ( Config,
+    DesiredTeamState (..),
     Group (..),
     Team (..),
     currentDesiredTeamState,
-    parseTeamList,
+    runConfig,
     showDesiredTeamStateList,
   )
+import qualified Config (parse)
 import Control.Category ((>>>))
 import Control.Lens ((^.))
 import Control.Monad (unless)
@@ -67,7 +69,8 @@ newtype GetDisplayName = GetDisplayName
   }
 
 type CanonicalEffects =
-  '[ Channels,
+  '[ Config,
+     Channels,
      Users,
      Groups,
      Input NetCtx,
@@ -79,7 +82,8 @@ type CanonicalEffects =
 
 runCanonical :: Sem CanonicalEffects Text -> IO (Either Text Text)
 runCanonical =
-  runChannels
+  runConfig
+    >>> runChannels
     >>> runUsers
     >>> runGroups
     >>> runNetCtx
@@ -89,7 +93,8 @@ runCanonical =
     >>> runFinal @IO
 
 ensure ::
-  ( Member (Final IO) r,
+  ( Member Config r,
+    Member (Final IO) r,
     Member (Error Text) r,
     Member Channels r,
     Member Users r,
@@ -98,7 +103,7 @@ ensure ::
   Text ->
   Sem r Text
 ensure inputText = do
-  records <- embedFinal $ parseTeamList inputText
+  records <- Config.parse inputText
   getDisplayName <- getDisplayNameM
   teamResults <- traverse (wrapTeamResult $ ensureTeamState getDisplayName) records
   return $ unlines teamResults
@@ -106,7 +111,8 @@ ensure inputText = do
     wrapTeamResult f record = ("Team " <> team record <> ": success!") <$ f record
 
 dryRunEnsure ::
-  ( Member (Final IO) r,
+  ( Member Config r,
+    Member (Final IO) r,
     Member (Error Text) r,
     Member Users r
   ) =>
@@ -114,7 +120,7 @@ dryRunEnsure ::
   Sem r Text
 dryRunEnsure inputText = do
   time <- embedFinal getCurrentTime
-  desiredStateList <- embedFinal $ currentDesiredTeamState time <<$>> parseTeamList inputText
+  desiredStateList <- currentDesiredTeamState time <<$>> Config.parse inputText
   getDisplayName <- getDisplayNameM
   showDesiredTeamStateList (unGetDisplayName getDisplayName) desiredStateList
 

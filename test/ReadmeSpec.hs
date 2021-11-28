@@ -4,16 +4,19 @@ module ReadmeSpec (spec) where
 
 import Config
   ( Group (..),
+    Team,
     currentDesiredTeamState,
     currentGroups,
-    parseTeamList,
+    runConfig,
     showDesiredTeamStateList,
   )
+import qualified Config (parse)
 import Data.Function ((&))
 import qualified Data.Set as Set
 import Data.Text (Text, intercalate, lines, unlines)
 import Data.Text.IO (readFile)
 import Data.Time.Format.ISO8601 (iso8601ParseM)
+import Polysemy (runM)
 import Test.Hspec
   ( Spec,
     it,
@@ -59,6 +62,9 @@ spec = do
 
     result <- dryRunExample
     showDesiredTeamStateList mockGetDisplayName states `shouldBe` Just result
+
+parseTeamList :: Text -> IO [Team]
+parseTeamList = runM . runConfig . Config.parse
 
 mockGetDisplayName :: Text -> Maybe Text
 mockGetDisplayName = Just . ("@" <>)

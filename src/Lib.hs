@@ -26,7 +26,7 @@ import qualified Data.Set as Set
 import Data.Text (Text, filter, pack, unlines)
 import Data.Time.Clock (getCurrentTime)
 import IO (Env, runEnv)
-import Polysemy (Embed, Final, Member, Members, Sem, embedFinal, embedToFinal, runFinal)
+import Polysemy (Embed, Final, Member, Sem, embedFinal, embedToFinal, runFinal)
 import Polysemy.Error (Error, errorToIOFinal, note)
 import Polysemy.View (View (..))
 import Slack.Channel as Channel
@@ -63,7 +63,7 @@ import Text.Show.Functions ()
 import Prelude hiding (filter, unlines)
 
 newtype GetDisplayName = GetDisplayName
-  { unGetDisplayName :: forall r. Members '[Final IO, Error Text] r => Text -> Sem r Text
+  { unGetDisplayName :: forall r. Member (Error Text) r => Text -> Sem r Text
   }
 
 type CanonicalEffects =
@@ -142,8 +142,7 @@ ensureTeamState getDisplayName record = do
   traverse_ (ensureGroupState [channelID]) $ groupList desiredTeamState
 
 ensureChannelTopic ::
-  ( Member (Final IO) r,
-    Member (Error Text) r,
+  ( Member (Error Text) r,
     Member Channels r
   ) =>
   GetDisplayName ->

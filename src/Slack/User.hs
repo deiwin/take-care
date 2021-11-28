@@ -3,24 +3,23 @@ module Slack.User
     id,
     displayName,
     Users,
-    get,
     listAll,
     runUsers,
   )
 where
 
-import Control.Lens ((&), (.~), (^..), (^?))
+import Control.Lens ((&), (^..), (^?))
 import Control.Lens.TH (makeLenses)
 import Data.Aeson (FromJSON (parseJSON), withObject, (.:), (.:?))
 import Data.Aeson.Lens (key, values)
 import Data.Maybe (fromMaybe)
 import Data.Text as T (Text, null)
 import GHC.Generics (Generic)
-import Network.Wreq (defaults, param)
+import Network.Wreq (defaults)
 import Polysemy (Embed, InterpreterFor, Member, Sem, interpret, makeSem)
 import Polysemy.Error (Error, note)
 import Polysemy.Input (Input)
-import Slack.Util (NetCtx, fromJSON, slackGet, slackGetPaginated)
+import Slack.Util (NetCtx, fromJSON, slackGetPaginated)
 import Prelude hiding (id)
 
 data User = User
@@ -44,7 +43,6 @@ instance FromJSON User where
     return User {..}
 
 data Users m a where
-  Get :: Text -> Users m User
   ListAll :: Users m [User]
 
 makeSem ''Users
@@ -56,21 +54,7 @@ runUsers ::
   ) =>
   InterpreterFor Users r
 runUsers = interpret \case
-  Get id -> getUser id
   ListAll -> listAllUsers
-
-getUser ::
-  ( Member (Embed IO) r,
-    Member (Input NetCtx) r,
-    Member (Error Text) r
-  ) =>
-  Text ->
-  Sem r User
-getUser userID = do
-  let opts = defaults & param "user" .~ [userID]
-  respBody <- slackGet opts "users.info"
-  val <- (respBody ^? key "user") & note "\"users.info\" response didn't include a \"user\" field"
-  fromJSON val
 
 listAllUsers ::
   ( Member (Embed IO) r,

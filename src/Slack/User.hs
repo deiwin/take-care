@@ -17,7 +17,7 @@ import Data.Maybe (fromMaybe)
 import Data.Text as T (Text, null)
 import GHC.Generics (Generic)
 import Network.Wreq (defaults, param)
-import Polysemy (Final, InterpreterFor, Member, Sem, interpret, makeSem)
+import Polysemy (Embed, InterpreterFor, Member, Sem, interpret, makeSem)
 import Polysemy.Error (Error, note)
 import Polysemy.Input (Input)
 import Slack.Util (NetCtx, fromJSON, slackGet, slackGetPaginated)
@@ -50,7 +50,7 @@ data Users m a where
 makeSem ''Users
 
 runUsers ::
-  ( Member (Final IO) r,
+  ( Member (Embed IO) r,
     Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
@@ -60,7 +60,7 @@ runUsers = interpret \case
   ListAll -> listAllUsers
 
 getUser ::
-  ( Member (Final IO) r,
+  ( Member (Embed IO) r,
     Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
@@ -73,7 +73,7 @@ getUser userID = do
   fromJSON val
 
 listAllUsers ::
-  ( Member (Final IO) r,
+  ( Member (Embed IO) r,
     Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>

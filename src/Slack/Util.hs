@@ -22,7 +22,7 @@ import Data.Text as T (Text, null, pack)
 import IO (Env, lookup)
 import Network.Wreq (Options, Response, asValue, auth, defaults, oauth2Bearer, param, responseBody)
 import Network.Wreq.Session (Session, getWith, newAPISession, postWith)
-import Polysemy (Embed, Final, InterpreterFor, Member, Sem, embed, embedFinal)
+import Polysemy (Embed, InterpreterFor, Member, Sem, embed)
 import Polysemy.Error (Error, note, throw)
 import Polysemy.Input (Input, input, runInputConst)
 import Prelude hiding (lookup)
@@ -45,7 +45,7 @@ slackURL :: String -> String
 slackURL = ("https://slack.com/api/" ++)
 
 slackGet ::
-  ( Member (Final IO) r,
+  ( Member (Embed IO) r,
     Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
@@ -56,11 +56,11 @@ slackGet opts method = do
   (NetCtx apiToken sess) <- input @NetCtx
   let optsWithAuth = opts & auth ?~ oauth2Bearer apiToken
   let url = slackURL method
-  resp <- embedFinal (asValue =<< getWith optsWithAuth sess url)
+  resp <- embed (asValue =<< getWith optsWithAuth sess url)
   handleSlackError "GET" method resp
 
 slackGetPaginated ::
-  ( Member (Final IO) r,
+  ( Member (Embed IO) r,
     Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
@@ -70,7 +70,7 @@ slackGetPaginated ::
 slackGetPaginated = slackGetPaginated' Nothing []
 
 slackGetPaginated' ::
-  ( Member (Final IO) r,
+  ( Member (Embed IO) r,
     Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
@@ -89,7 +89,7 @@ slackGetPaginated' cursor !acc opts method = do
     Nothing -> return $ reverse nextAcc
 
 slackPost ::
-  ( Member (Final IO) r,
+  ( Member (Embed IO) r,
     Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
@@ -101,7 +101,7 @@ slackPost params method = do
   let optsWithAuth = defaults & auth ?~ oauth2Bearer apiToken
   let url = slackURL method
   let body = toJSON $ object params
-  resp <- embedFinal $ asValue =<< postWith optsWithAuth sess url body
+  resp <- embed $ asValue =<< postWith optsWithAuth sess url body
   handleSlackError "POST" method resp
 
 handleSlackError ::

@@ -18,7 +18,7 @@ import qualified Data.List as L (find)
 import Data.Text (Text)
 import GHC.Generics (Generic)
 import Network.Wreq (defaults, param)
-import Polysemy (Final, InterpreterFor, Member, Sem, interpret, makeSem)
+import Polysemy (Embed, InterpreterFor, Member, Sem, interpret, makeSem)
 import Polysemy.Error (Error, note)
 import Polysemy.Input (Input)
 import Slack.Util (NetCtx, fromJSON, slackGetPaginated, slackPost)
@@ -49,7 +49,7 @@ data Channels m a where
 makeSem ''Channels
 
 runChannels ::
-  ( Member (Final IO) r,
+  ( Member (Embed IO) r,
     Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
@@ -60,7 +60,7 @@ runChannels = interpret \case
   SetTopic id topic -> setChannelTopic id topic
 
 findChannel ::
-  ( Member (Final IO) r,
+  ( Member (Embed IO) r,
     Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
@@ -79,7 +79,7 @@ findChannel expectedName = do
   return $ L.find (\x -> (x ^. name) == expectedName) channels
 
 createChannel ::
-  ( Member (Final IO) r,
+  ( Member (Embed IO) r,
     Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
@@ -92,7 +92,7 @@ createChannel newName = do
   fromJSON val
 
 setChannelTopic ::
-  ( Member (Final IO) r,
+  ( Member (Embed IO) r,
     Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>

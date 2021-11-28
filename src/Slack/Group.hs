@@ -22,7 +22,7 @@ import qualified Data.List as L (find)
 import Data.Text (Text, unpack)
 import GHC.Generics (Generic)
 import Network.Wreq (defaults, param)
-import Polysemy (Final, InterpreterFor, Member, Sem, interpret, makeSem)
+import Polysemy (Embed, InterpreterFor, Member, Sem, interpret, makeSem)
 import Polysemy.Error (Error, note)
 import Polysemy.Input (Input)
 import Slack.Util (NetCtx, fromJSON, slackGet, slackPost)
@@ -55,7 +55,7 @@ data Groups m a where
 makeSem ''Groups
 
 runGroups ::
-  ( Member (Final IO) r,
+  ( Member (Embed IO) r,
     Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
@@ -68,7 +68,7 @@ runGroups = interpret \case
   Create handle name defaultChannelIDs -> createGroup handle name defaultChannelIDs
 
 getGroupMembers ::
-  ( Member (Final IO) r,
+  ( Member (Embed IO) r,
     Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
@@ -82,7 +82,7 @@ getGroupMembers groupID = do
   return $ respBody ^.. key "users" . values . _String
 
 setGroupMembers ::
-  ( Member (Final IO) r,
+  ( Member (Embed IO) r,
     Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
@@ -98,7 +98,7 @@ setGroupMembers groupID userIDs = do
   return ()
 
 setGroupChannels ::
-  ( Member (Final IO) r,
+  ( Member (Embed IO) r,
     Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
@@ -114,7 +114,7 @@ setGroupChannels groupID defaultChannelIDs = do
   return ()
 
 findGroup ::
-  ( Member (Final IO) r,
+  ( Member (Embed IO) r,
     Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
@@ -130,7 +130,7 @@ findGroup expectedHandle = do
   return $ L.find (\x -> (x ^. handle) == expectedHandle) groups
 
 createGroup ::
-  ( Member (Final IO) r,
+  ( Member (Embed IO) r,
     Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>

@@ -86,7 +86,7 @@ runCanonical =
     >>> runEnv
     >>> errorToIOFinal
     >>> embedToFinal @IO
-    >>> runFinal
+    >>> runFinal @IO
 
 ensure ::
   ( Member (Final IO) r,

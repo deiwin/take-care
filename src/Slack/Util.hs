@@ -19,7 +19,8 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS (pack)
 import Data.Maybe (maybeToList)
 import Data.Text as T (Text, null, pack)
-import IO (Env, lookup)
+import IO (Env)
+import qualified IO as Env (lookup)
 import Network.Wreq (Options, Response, asValue, auth, defaults, oauth2Bearer, param, responseBody)
 import Network.Wreq.Session (Session, getWith, newAPISession, postWith)
 import Polysemy (Embed, InterpreterFor, Member, Sem, embed)
@@ -37,7 +38,7 @@ runNetCtx ::
   InterpreterFor (Input NetCtx) r
 runNetCtx program = do
   session <- embed newAPISession
-  tokenM <- lookup "API_TOKEN"
+  tokenM <- Env.lookup "API_TOKEN"
   token <- BS.pack <$> note "API_TOKEN env variable not set" tokenM
   runInputConst (NetCtx token session) program
 

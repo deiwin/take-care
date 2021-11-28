@@ -26,9 +26,9 @@ import Data.List ((\\))
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Data.Text (Text, filter, pack, unlines)
-import Data.Time.Clock (getCurrentTime)
-import IO (Env, runEnv)
-import Polysemy (Embed, Final, Member, Sem, embedFinal, embedToFinal, runFinal)
+import IO (Env, Time, runEnv, runTime)
+import qualified IO as Time (getCurrent)
+import Polysemy (Embed, Final, Member, Sem, embedToFinal, runFinal)
 import Polysemy.Error (Error, errorToIOFinal, note)
 import Polysemy.Input (Input)
 import Slack.Channel as Channel
@@ -69,7 +69,8 @@ newtype GetDisplayName = GetDisplayName
   }
 
 type CanonicalEffects =
-  '[ Config,
+  '[ Time,
+     Config,
      Channels,
      Users,
      Groups,
@@ -82,7 +83,8 @@ type CanonicalEffects =
 
 runCanonical :: Sem CanonicalEffects Text -> IO (Either Text Text)
 runCanonical =
-  runConfig
+  runTime
+    >>> runConfig
     >>> runChannels
     >>> runUsers
     >>> runGroups
@@ -94,7 +96,7 @@ runCanonical =
 
 ensure ::
   ( Member Config r,
-    Member (Final IO) r,
+    Member Time r,
     Member (Error Text) r,
     Member Channels r,
     Member Users r,
@@ -112,14 +114,14 @@ ensure inputText = do
 
 dryRunEnsure ::
   ( Member Config r,
-    Member (Final IO) r,
+    Member Time r,
     Member (Error Text) r,
     Member Users r
   ) =>
   Text ->
   Sem r Text
 dryRunEnsure inputText = do
-  time <- embedFinal getCurrentTime
+  time <- Time.getCurrent
   desiredStateList <- currentDesiredTeamState time <<$>> Config.parse inputText
   getDisplayName <- getDisplayNameM
   showDesiredTeamStateList (unGetDisplayName getDisplayName) desiredStateList
@@ -131,7 +133,7 @@ listUsers = do
     formatLine user = pack $ printf "%s: %s" (user ^. User.id) (user ^. displayName)
 
 ensureTeamState ::
-  ( Member (Final IO) r,
+  ( Member Time r,
     Member (Error Text) r,
     Member Channels r,
     Member Groups r
@@ -140,7 +142,7 @@ ensureTeamState ::
   Team ->
   Sem r ()
 ensureTeamState getDisplayName record = do
-  time <- embedFinal getCurrentTime
+  time <- Time.getCurrent
   let desiredTeamState = currentDesiredTeamState time record
   channel <- findOrCreateChannel $ teamChannelName desiredTeamState
   ensureChannelTopic getDisplayName channel desiredTeamState

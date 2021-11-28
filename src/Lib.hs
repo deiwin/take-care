@@ -34,21 +34,21 @@ import Polysemy.Input (Input)
 import Slack.Channel as Channel
   ( Channel,
     Channels,
-    create,
-    find,
     id,
     runChannels,
-    setTopic,
     topic,
   )
+import qualified Slack.Channel as Channels (create, find, setTopic)
 import Slack.Group as Group
   ( Groups,
     channelIDs,
-    create,
-    find,
-    getMembers,
     id,
     runGroups,
+  )
+import qualified Slack.Group as Groups
+  ( create,
+    find,
+    getMembers,
     setChannels,
     setMembers,
   )
@@ -56,9 +56,9 @@ import Slack.User as User
   ( Users,
     displayName,
     id,
-    listAll,
     runUsers,
   )
+import qualified Slack.User as Users (listAll)
 import Slack.Util (NetCtx, runNetCtx)
 import Text.Printf (printf)
 import Text.Show.Functions ()
@@ -128,7 +128,7 @@ dryRunEnsure inputText = do
 
 listUsers :: Member Users r => Sem r Text
 listUsers = do
-  unlines . fmap formatLine <$> User.listAll
+  unlines . fmap formatLine <$> Users.listAll
   where
     formatLine user = pack $ printf "%s: %s" (user ^. User.id) (user ^. displayName)
 
@@ -159,7 +159,7 @@ ensureChannelTopic ::
   Sem r ()
 ensureChannelTopic getDisplayName channel desiredTeamState = do
   newTopic <- topicGivenDisplayNames desiredTeamState (unGetDisplayName getDisplayName)
-  unless (same currentTopic newTopic) $ setTopic channelID newTopic
+  unless (same currentTopic newTopic) $ Channels.setTopic channelID newTopic
   where
     channelID = channel ^. Channel.id
     currentTopic = channel ^. Channel.topic
@@ -169,27 +169,27 @@ ensureChannelTopic getDisplayName channel desiredTeamState = do
 
 findOrCreateChannel :: Member Channels r => Text -> Sem r Channel
 findOrCreateChannel name = do
-  current <- Channel.find name
-  maybe (Channel.create name) return current
+  current <- Channels.find name
+  maybe (Channels.create name) return current
 
 ensureGroupState :: Member Groups r => [Text] -> Group -> Sem r ()
 ensureGroupState defaultChannelIDs group = do
-  existingGroup <- Group.find $ handle group
+  existingGroup <- Groups.find $ handle group
   slackGroup <- maybe createNew return existingGroup
   let groupID = slackGroup ^. Group.id
 
-  currentMembers <- Set.fromList <$> Group.getMembers groupID
-  unless (memberIDs group == currentMembers) $ Group.setMembers groupID $ Set.toList $ memberIDs group
+  currentMembers <- Set.fromList <$> Groups.getMembers groupID
+  unless (memberIDs group == currentMembers) $ Groups.setMembers groupID $ Set.toList $ memberIDs group
 
   let currentChannels = slackGroup ^. channelIDs
-  unless (same defaultChannelIDs currentChannels) $ Group.setChannels groupID defaultChannelIDs
+  unless (same defaultChannelIDs currentChannels) $ Groups.setChannels groupID defaultChannelIDs
   where
-    createNew = Group.create (handle group) (description group) defaultChannelIDs
+    createNew = Groups.create (handle group) (description group) defaultChannelIDs
     same a b = null (a \\ b) && null (b \\ a)
 
 getDisplayNameM :: Member Users r => Sem r GetDisplayName
 getDisplayNameM = do
-  map <- Map.fromList . fmap toPair <$> User.listAll
+  map <- Map.fromList . fmap toPair <$> Users.listAll
   return $ GetDisplayName $ lookup map
   where
     lookup map id = Map.lookup id map & note (pack (printf "Could not find user with ID: %s" id))

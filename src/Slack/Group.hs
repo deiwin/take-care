@@ -22,10 +22,10 @@ import qualified Data.List as L (find)
 import Data.Text (Text, unpack)
 import GHC.Generics (Generic)
 import Network.Wreq (defaults, param)
-import Polysemy (Embed, InterpreterFor, Member, Sem, interpret, makeSem)
+import Polysemy (InterpreterFor, Member, Members, Sem, interpret, makeSem)
 import Polysemy.Error (Error, note)
-import Polysemy.Input (Input)
-import Slack.Util (NetCtx, fromJSON, slackGet, slackPost)
+import Slack.Util (Slack, fromJSON)
+import qualified Slack.Util as Slack (get, post)
 import Prelude hiding (id)
 
 data Group = Group
@@ -54,12 +54,7 @@ data Groups m a where
 
 makeSem ''Groups
 
-runGroups ::
-  ( Member (Embed IO) r,
-    Member (Input NetCtx) r,
-    Member (Error Text) r
-  ) =>
-  InterpreterFor Groups r
+runGroups :: Members '[Slack, Error Text] r => InterpreterFor Groups r
 runGroups = interpret \case
   GetMembers id -> getGroupMembers id
   SetMembers groupID userIDs -> setGroupMembers groupID userIDs
@@ -67,83 +62,49 @@ runGroups = interpret \case
   Find handle -> findGroup handle
   Create handle name defaultChannelIDs -> createGroup handle name defaultChannelIDs
 
-getGroupMembers ::
-  ( Member (Embed IO) r,
-    Member (Input NetCtx) r,
-    Member (Error Text) r
-  ) =>
-  Text ->
-  Sem r [Text]
+getGroupMembers :: Member Slack r => Text -> Sem r [Text]
 getGroupMembers groupID = do
   let opts =
         defaults & param "usergroup" .~ [groupID]
           & param "include_disabled" .~ ["true"]
-  respBody <- slackGet opts "usergroups.users.list"
+  respBody <- Slack.get opts "usergroups.users.list"
   return $ respBody ^.. key "users" . values . _String
 
-setGroupMembers ::
-  ( Member (Embed IO) r,
-    Member (Input NetCtx) r,
-    Member (Error Text) r
-  ) =>
-  Text ->
-  [Text] ->
-  Sem r ()
+setGroupMembers :: Member Slack r => Text -> [Text] -> Sem r ()
 setGroupMembers groupID userIDs = do
   let params =
         [ "usergroup" .= groupID,
           "users" .= intercalate "," (unpack <$> userIDs)
         ]
-  _ <- slackPost params "usergroups.users.update"
+  _ <- Slack.post params "usergroups.users.update"
   return ()
 
-setGroupChannels ::
-  ( Member (Embed IO) r,
-    Member (Input NetCtx) r,
-    Member (Error Text) r
-  ) =>
-  Text ->
-  [Text] ->
-  Sem r ()
+setGroupChannels :: Member Slack r => Text -> [Text] -> Sem r ()
 setGroupChannels groupID defaultChannelIDs = do
   let params =
         [ "usergroup" .= groupID,
           "channels" .= intercalate "," (unpack <$> defaultChannelIDs)
         ]
-  _ <- slackPost params "usergroups.update"
+  _ <- Slack.post params "usergroups.update"
   return ()
 
-findGroup ::
-  ( Member (Embed IO) r,
-    Member (Input NetCtx) r,
-    Member (Error Text) r
-  ) =>
-  Text ->
-  Sem r (Maybe Group)
+findGroup :: Members '[Slack, Error Text] r => Text -> Sem r (Maybe Group)
 findGroup expectedHandle = do
   let opts = defaults & param "include_disabled" .~ ["true"]
-  respBody <- slackGet opts "usergroups.list"
+  respBody <- Slack.get opts "usergroups.list"
   groups <-
     traverse fromJSON
       . (^.. values)
       =<< ((respBody ^? key "usergroups") & note "\"users.list\" response didn't include a \"channels\" field")
   return $ L.find (\x -> (x ^. handle) == expectedHandle) groups
 
-createGroup ::
-  ( Member (Embed IO) r,
-    Member (Input NetCtx) r,
-    Member (Error Text) r
-  ) =>
-  Text ->
-  Text ->
-  [Text] ->
-  Sem r Group
+createGroup :: Members '[Slack, Error Text] r => Text -> Text -> [Text] -> Sem r Group
 createGroup groupHandle groupName defaultChannelIDs = do
   let params =
         [ "handle" .= groupHandle,
           "name" .= groupName,
           "channels" .= intercalate "," (unpack <$> defaultChannelIDs)
         ]
-  respBody <- slackPost params "usergroups.create"
+  respBody <- Slack.post params "usergroups.create"
   val <- (respBody ^? key "usergroup") & note "\"usergroups.create\" response didn't include a \"usergroup\" key"
   fromJSON val

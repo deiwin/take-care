@@ -1,10 +1,16 @@
 module Slack.Util
-  ( slackGet,
-    slackGetPaginated,
-    slackPost,
-    fromJSON,
-    NetCtx (..),
+  ( fromJSON,
+
+    -- * Input NetCtx effect
+    NetCtx,
     runNetCtx,
+
+    -- * Slack API effect
+    Slack,
+    runSlack,
+    get,
+    getPaginated,
+    post,
   )
 where
 
@@ -23,7 +29,7 @@ import IO (Env)
 import qualified IO as Env (lookup)
 import Network.Wreq (Options, Response, asValue, auth, defaults, oauth2Bearer, param, responseBody)
 import Network.Wreq.Session (Session, getWith, newAPISession, postWith)
-import Polysemy (Embed, InterpreterFor, Member, Sem, embed)
+import Polysemy (Embed, InterpreterFor, Member, Sem, embed, interpret, makeSem)
 import Polysemy.Error (Error, note, throw)
 import Polysemy.Input (Input, input, runInputConst)
 import Prelude hiding (lookup)
@@ -41,6 +47,24 @@ runNetCtx program = do
   tokenM <- Env.lookup "API_TOKEN"
   token <- BS.pack <$> note "API_TOKEN env variable not set" tokenM
   runInputConst (NetCtx token session) program
+
+data Slack m a where
+  Get :: Options -> String -> Slack m Value
+  GetPaginated :: Options -> String -> Slack m [Value]
+  Post :: [Pair] -> String -> Slack m Value
+
+makeSem ''Slack
+
+runSlack ::
+  ( Member (Embed IO) r,
+    Member (Input NetCtx) r,
+    Member (Error Text) r
+  ) =>
+  InterpreterFor Slack r
+runSlack = interpret \case
+  Get opts method -> slackGet opts method
+  GetPaginated opts method -> slackGetPaginated opts method
+  Post params method -> slackPost params method
 
 slackURL :: String -> String
 slackURL = ("https://slack.com/api/" ++)

@@ -16,10 +16,10 @@ import Data.Maybe (fromMaybe)
 import Data.Text as T (Text, null)
 import GHC.Generics (Generic)
 import Network.Wreq (defaults)
-import Polysemy (Embed, InterpreterFor, Member, Sem, interpret, makeSem)
+import Polysemy (InterpreterFor, Members, Sem, interpret, makeSem)
 import Polysemy.Error (Error, note)
-import Polysemy.Input (Input)
-import Slack.Util (NetCtx, fromJSON, slackGetPaginated)
+import Slack.Util (Slack, fromJSON)
+import qualified Slack.Util as Slack (getPaginated)
 import Prelude hiding (id)
 
 data User = User
@@ -47,23 +47,13 @@ data Users m a where
 
 makeSem ''Users
 
-runUsers ::
-  ( Member (Embed IO) r,
-    Member (Input NetCtx) r,
-    Member (Error Text) r
-  ) =>
-  InterpreterFor Users r
+runUsers :: Members '[Slack, Error Text] r => InterpreterFor Users r
 runUsers = interpret \case
   ListAll -> listAllUsers
 
-listAllUsers ::
-  ( Member (Embed IO) r,
-    Member (Input NetCtx) r,
-    Member (Error Text) r
-  ) =>
-  Sem r [User]
+listAllUsers :: Members '[Slack, Error Text] r => Sem r [User]
 listAllUsers = do
-  respBodies <- slackGetPaginated defaults "users.list"
+  respBodies <- Slack.getPaginated defaults "users.list"
   vals <-
     concatMap (^.. values)
       <$> (traverse (^? key "members") respBodies & note "\"users.list\" response didn't include a \"members\" field")

@@ -18,10 +18,10 @@ import qualified Data.List as L (find)
 import Data.Text (Text)
 import GHC.Generics (Generic)
 import Network.Wreq (defaults, param)
-import Polysemy (Embed, InterpreterFor, Member, Sem, interpret, makeSem)
+import Polysemy (InterpreterFor, Member, Members, Sem, interpret, makeSem)
 import Polysemy.Error (Error, note)
-import Polysemy.Input (Input)
-import Slack.Util (NetCtx, fromJSON, slackGetPaginated, slackPost)
+import Slack.Util (Slack, fromJSON)
+import qualified Slack.Util as Slack (getPaginated, post)
 import Prelude hiding (id)
 
 data Channel = Channel
@@ -48,61 +48,37 @@ data Channels m a where
 
 makeSem ''Channels
 
-runChannels ::
-  ( Member (Embed IO) r,
-    Member (Input NetCtx) r,
-    Member (Error Text) r
-  ) =>
-  InterpreterFor Channels r
+runChannels :: Members '[Slack, Error Text] r => InterpreterFor Channels r
 runChannels = interpret \case
   Find name -> findChannel name
   Create name -> createChannel name
   SetTopic id topic -> setChannelTopic id topic
 
-findChannel ::
-  ( Member (Embed IO) r,
-    Member (Input NetCtx) r,
-    Member (Error Text) r
-  ) =>
-  Text ->
-  Sem r (Maybe Channel)
+findChannel :: Members '[Slack, Error Text] r => Text -> Sem r (Maybe Channel)
 findChannel expectedName = do
   let params =
         defaults & param "types" .~ ["public_channel,private_channel"]
           & param "exclude_archived" .~ ["true"]
           & param "limit" .~ ["1000"]
-  respBodies <- slackGetPaginated params "conversations.list"
+  respBodies <- Slack.getPaginated params "conversations.list"
   channels <-
     traverse fromJSON
       . concatMap (^.. values)
       =<< (traverse (^? key "channels") respBodies & note "\"users.list\" response didn't include a \"channels\" field")
   return $ L.find (\x -> (x ^. name) == expectedName) channels
 
-createChannel ::
-  ( Member (Embed IO) r,
-    Member (Input NetCtx) r,
-    Member (Error Text) r
-  ) =>
-  Text ->
-  Sem r Channel
+createChannel :: Members '[Slack, Error Text] r => Text -> Sem r Channel
 createChannel newName = do
   let params = ["name" .= newName]
-  respBody <- slackPost params "conversations.create"
+  respBody <- Slack.post params "conversations.create"
   val <- (respBody ^? key "channel") & note "\"conversations.create\" response didn't include a \"channel\" key"
   fromJSON val
 
-setChannelTopic ::
-  ( Member (Embed IO) r,
-    Member (Input NetCtx) r,
-    Member (Error Text) r
-  ) =>
-  Text ->
-  Text ->
-  Sem r ()
+setChannelTopic :: Member Slack r => Text -> Text -> Sem r ()
 setChannelTopic channelID newTopic = do
   let params =
         [ "channel" .= channelID,
           "topic" .= newTopic
         ]
-  _ <- slackPost params "conversations.setTopic"
+  _ <- Slack.post params "conversations.setTopic"
   return ()

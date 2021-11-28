@@ -59,7 +59,7 @@ import Slack.User as User
     runUsers,
   )
 import qualified Slack.User as Users (listAll)
-import Slack.Util (NetCtx, runNetCtx)
+import Slack.Util (NetCtx, Slack, runNetCtx, runSlack)
 import Text.Printf (printf)
 import Text.Show.Functions ()
 import Prelude hiding (filter, unlines)
@@ -74,6 +74,7 @@ type CanonicalEffects =
      Channels,
      Users,
      Groups,
+     Slack,
      Input NetCtx,
      Env,
      Error Text,
@@ -88,6 +89,7 @@ runCanonical =
     >>> runChannels
     >>> runUsers
     >>> runGroups
+    >>> runSlack
     >>> runNetCtx
     >>> runEnv
     >>> errorToIOFinal

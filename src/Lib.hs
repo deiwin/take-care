@@ -28,7 +28,7 @@ import Data.Time.Clock (getCurrentTime)
 import IO (Env, runEnv)
 import Polysemy (Embed, Final, Member, Sem, embedFinal, embedToFinal, runFinal)
 import Polysemy.Error (Error, errorToIOFinal, note)
-import Polysemy.View (View (..))
+import Polysemy.Input (Input)
 import Slack.Channel as Channel
   ( Channel,
     Channels,
@@ -70,7 +70,7 @@ type CanonicalEffects =
   '[ Channels,
      Users,
      Groups,
-     View NetCtx,
+     Input NetCtx,
      Env,
      Error Text,
      Embed IO,

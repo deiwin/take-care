@@ -24,7 +24,7 @@ import GHC.Generics (Generic)
 import Network.Wreq (defaults, param)
 import Polysemy (Final, InterpreterFor, Member, Sem, interpret, makeSem)
 import Polysemy.Error (Error, note)
-import Polysemy.View (View)
+import Polysemy.Input (Input)
 import Slack.Util (NetCtx, fromJSON, slackGet, slackPost)
 import Prelude hiding (id)
 
@@ -56,7 +56,7 @@ makeSem ''Groups
 
 runGroups ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r,
+    Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
   InterpreterFor Groups r
@@ -69,7 +69,7 @@ runGroups = interpret \case
 
 getGroupMembers ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r,
+    Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
   Text ->
@@ -83,7 +83,7 @@ getGroupMembers groupID = do
 
 setGroupMembers ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r,
+    Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
   Text ->
@@ -99,7 +99,7 @@ setGroupMembers groupID userIDs = do
 
 setGroupChannels ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r,
+    Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
   Text ->
@@ -115,7 +115,7 @@ setGroupChannels groupID defaultChannelIDs = do
 
 findGroup ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r,
+    Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
   Text ->
@@ -131,7 +131,7 @@ findGroup expectedHandle = do
 
 createGroup ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r,
+    Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
   Text ->

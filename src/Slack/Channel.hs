@@ -20,7 +20,7 @@ import GHC.Generics (Generic)
 import Network.Wreq (defaults, param)
 import Polysemy (Final, InterpreterFor, Member, Sem, interpret, makeSem)
 import Polysemy.Error (Error, note)
-import Polysemy.View (View)
+import Polysemy.Input (Input)
 import Slack.Util (NetCtx, fromJSON, slackGetPaginated, slackPost)
 import Prelude hiding (id)
 
@@ -50,7 +50,7 @@ makeSem ''Channels
 
 runChannels ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r,
+    Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
   InterpreterFor Channels r
@@ -61,7 +61,7 @@ runChannels = interpret \case
 
 findChannel ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r,
+    Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
   Text ->
@@ -80,7 +80,7 @@ findChannel expectedName = do
 
 createChannel ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r,
+    Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
   Text ->
@@ -93,7 +93,7 @@ createChannel newName = do
 
 setChannelTopic ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r,
+    Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
   Text ->

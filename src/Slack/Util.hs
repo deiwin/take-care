@@ -8,6 +8,7 @@ module Slack.Util
   )
 where
 
+import Control.Category ((>>>))
 import Control.Lens ((&), (.~), (?~), (^.), (^?), (^?!))
 import Control.Monad (mfilter)
 import Data.Aeson (FromJSON, Value, object, toJSON)
@@ -21,11 +22,10 @@ import Data.Text as T (Text, null, pack)
 import IO (Env, lookup)
 import Network.Wreq (Options, Response, asValue, auth, defaults, oauth2Bearer, param, responseBody)
 import Network.Wreq.Session (Session, getWith, newAPISession, postWith)
-import Polysemy (Embed, Final, InterpreterFor, Member, Sem, embed, embedFinal, interpret)
+import Polysemy (Embed, Final, InterpreterFor, Member, Sem, embed, embedFinal)
 import Polysemy.Error (Error, note, throw)
-import Polysemy.View (View (..), see)
+import Polysemy.Input (Input, input, runInputConst)
 import Prelude hiding (lookup)
-import Control.Category ((>>>))
 
 data NetCtx = NetCtx ByteString Session
 
@@ -34,26 +34,26 @@ runNetCtx ::
     Member Env r,
     Member (Error Text) r
   ) =>
-  InterpreterFor (View NetCtx) r
+  InterpreterFor (Input NetCtx) r
 runNetCtx program = do
   session <- embed newAPISession
   tokenM <- lookup "API_TOKEN"
   token <- BS.pack <$> note "API_TOKEN env variable not set" tokenM
-  interpret (\case See -> return (NetCtx token session)) program
+  runInputConst (NetCtx token session) program
 
 slackURL :: String -> String
 slackURL = ("https://slack.com/api/" ++)
 
 slackGet ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r,
+    Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
   Options ->
   String ->
   Sem r Value
 slackGet opts method = do
-  (NetCtx apiToken sess) <- see @NetCtx
+  (NetCtx apiToken sess) <- input @NetCtx
   let optsWithAuth = opts & auth ?~ oauth2Bearer apiToken
   let url = slackURL method
   resp <- embedFinal (asValue =<< getWith optsWithAuth sess url)
@@ -61,7 +61,7 @@ slackGet opts method = do
 
 slackGetPaginated ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r,
+    Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
   Options ->
@@ -71,7 +71,7 @@ slackGetPaginated = slackGetPaginated' Nothing []
 
 slackGetPaginated' ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r,
+    Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
   Maybe Text ->
@@ -90,14 +90,14 @@ slackGetPaginated' cursor !acc opts method = do
 
 slackPost ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r,
+    Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
   [Pair] ->
   String ->
   Sem r Value
 slackPost params method = do
-  (NetCtx apiToken sess) <- see @NetCtx
+  (NetCtx apiToken sess) <- input @NetCtx
   let optsWithAuth = defaults & auth ?~ oauth2Bearer apiToken
   let url = slackURL method
   let body = toJSON $ object params

@@ -19,7 +19,7 @@ import GHC.Generics (Generic)
 import Network.Wreq (defaults, param)
 import Polysemy (Final, InterpreterFor, Member, Sem, interpret, makeSem)
 import Polysemy.Error (Error, note)
-import Polysemy.View (View)
+import Polysemy.Input (Input)
 import Slack.Util (NetCtx, fromJSON, slackGet, slackGetPaginated)
 import Prelude hiding (id)
 
@@ -51,7 +51,7 @@ makeSem ''Users
 
 runUsers ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r,
+    Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
   InterpreterFor Users r
@@ -61,7 +61,7 @@ runUsers = interpret \case
 
 getUser ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r,
+    Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
   Text ->
@@ -74,7 +74,7 @@ getUser userID = do
 
 listAllUsers ::
   ( Member (Final IO) r,
-    Member (View NetCtx) r,
+    Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
   Sem r [User]

@@ -61,11 +61,14 @@ findChannel expectedName = do
           & param "exclude_archived" .~ ["true"]
           & param "limit" .~ ["1000"]
   respBodies <- Slack.getPaginated params "conversations.list"
-  channels <-
-    traverse fromJSON
-      . concatMap (^.. values)
-      =<< (traverse (^? key "channels") respBodies & note "\"conversations.list\" response didn't include a \"channels\" field")
-  return $ L.find (\x -> (x ^. name) == expectedName) channels
+  channelBodies <-
+    respBodies
+      & traverse (^? key "channels")
+      & note "\"conversations.list\" response didn't include a \"channels\" field"
+  channelBodies
+    & concatMap (^.. values)
+    & traverse fromJSON
+    & fmap (L.find (\x -> (x ^. name) == expectedName))
 
 createChannel :: Members '[Slack, Error Text] r => Text -> Sem r Channel
 createChannel newName = do

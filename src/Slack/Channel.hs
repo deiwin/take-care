@@ -1,5 +1,5 @@
 module Slack.Channel
-  ( Channel,
+  ( Channel (..),
     id,
     topic,
     Channels,
@@ -29,7 +29,7 @@ data Channel = Channel
     _name :: Text,
     _topic :: Text
   }
-  deriving (Generic, Show)
+  deriving (Generic, Show, Eq)
 
 $(makeLenses ''Channel)
 

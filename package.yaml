@@ -97,3 +97,5 @@ tests:
     - neat-interpolation
     - containers
     - text
+    - aeson
+    - bytestring

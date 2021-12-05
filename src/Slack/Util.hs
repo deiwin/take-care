@@ -6,7 +6,7 @@ module Slack.Util
     runNetCtx,
 
     -- * Slack API effect
-    Slack,
+    Slack (..),
     runSlack,
     get,
     getPaginated,

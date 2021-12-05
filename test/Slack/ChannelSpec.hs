@@ -31,7 +31,7 @@ spec = do
     it "fails on a response of an empty object" $ do
       Channels.find "whatever"
         & runPaginatedWith ["{}"]
-        & (`shouldBe` Left "\"users.list\" response didn't include a \"channels\" field")
+        & (`shouldBe` Left "\"conversations.list\" response didn't include a \"channels\" field")
 
     it "retuns Nothing if the list of channels is empty" $ do
       Channels.find "whatever"

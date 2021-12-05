@@ -64,7 +64,7 @@ findChannel expectedName = do
   channels <-
     traverse fromJSON
       . concatMap (^.. values)
-      =<< (traverse (^? key "channels") respBodies & note "\"users.list\" response didn't include a \"channels\" field")
+      =<< (traverse (^? key "channels") respBodies & note "\"conversations.list\" response didn't include a \"channels\" field")
   return $ L.find (\x -> (x ^. name) == expectedName) channels
 
 createChannel :: Members '[Slack, Error Text] r => Text -> Sem r Channel

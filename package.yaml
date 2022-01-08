@@ -99,3 +99,4 @@ tests:
     - text
     - aeson
     - bytestring
+    - wreq

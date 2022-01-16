@@ -19,7 +19,7 @@ import Slack.Channel
     Channels,
     runChannels,
   )
-import qualified Slack.Channel as Channels (find)
+import qualified Slack.Channel as Channels (create, find, setTopic)
 import Slack.Util (Slack (..))
 import Test.Hspec
   ( Expectation,
@@ -174,6 +174,69 @@ spec = do
           ]
         & (`shouldBe` Right (Just (Channel {_id = "id", _name = "name", _topic = "topic"})))
 
+  describe "create" $ do
+    it "posts to conversations.create" $ do
+      Channels.create "name"
+        & runWithExpectations \case
+          Post _ method -> method `shouldBe` "conversations.create"
+          _ -> expectationFailure "Expected a Post query"
+
+    it "passes channel name paramater" $ do
+      Channels.create "channel_name"
+        & runWithExpectations \case
+          Post params _ -> params `shouldContain` [("name", "channel_name")]
+          _ -> expectationFailure "Expected a Post query"
+
+    it "fails on a response of an empty object" $ do
+      Channels.create "whatever"
+        & runPostConst "{}"
+        & (`shouldBe` Left "\"conversations.create\" response didn't include a \"channel\" key")
+
+    it "fails if channel object does not have an 'id' key" $ do
+      Channels.create "whatever"
+        & runPostConst "{\"channel\": {}}"
+        & (`shouldBe` Left "key \"id\" not found")
+
+    it "returns the Channel object" $ do
+      Channels.create "name"
+        & runPostConst
+          [trimming|
+            {
+              "channel": {
+                "id": "id",
+                "name": "name",
+                "topic": {
+                  "value": "topic"
+                }
+              }
+            }
+          |]
+        & (`shouldBe` Right (Channel {_id = "id", _name = "name", _topic = "topic"}))
+
+  describe "setTopic" $ do
+    it "posts to conversations.setTopic" $ do
+      Channels.setTopic "channel_name" "topic_message"
+        & runWithExpectations \case
+          Post _ method -> method `shouldBe` "conversations.setTopic"
+          _ -> expectationFailure "Expected a Post query"
+
+    it "passes channel name paramater" $ do
+      Channels.setTopic "channel_name" "topic_message"
+        & runWithExpectations \case
+          Post params _ -> params `shouldContain` [("channel", "channel_name")]
+          _ -> expectationFailure "Expected a Post query"
+
+    it "passes topic message paramater" $ do
+      Channels.setTopic "channel_name" "topic_message"
+        & runWithExpectations \case
+          Post params _ -> params `shouldContain` [("topic", "topic_message")]
+          _ -> expectationFailure "Expected a Post query"
+
+    it "ignores response body" $ do
+      Channels.setTopic "channel_name" "topic_message"
+        & runPostConst "{\"whatever\": {}}"
+        & (`shouldBe` Right ())
+
 runWithExpectations ::
   (forall rInitial x. (Slack (Sem rInitial) x -> IO ())) ->
   Sem '[Channels, Slack, Error Text, Embed IO] a ->
@@ -195,19 +258,11 @@ runWithExpectations expectations =
         GetPaginated _ _ -> expectations slackQuery $> []
         Post _ _ -> expectations slackQuery $> Null
 
-runGetPaginatedConst ::
-  [Text] ->
-  Sem
-    '[ Channels,
-       Slack,
-       Error Text
-     ]
-    a ->
-  Either Text a
-runGetPaginatedConst pages = runChannelsWith (constGetPaginated pages)
+runPostConst :: Text -> Sem '[Channels, Slack, Error Text] a -> Either Text a
+runPostConst page = runChannelsWith (nullSlackMatch {postResponse = Just page})
 
-constGetPaginated :: [Text] -> SlackResponse
-constGetPaginated pages = nullSlackMatch {getPaginatedResponse = Just pages}
+runGetPaginatedConst :: [Text] -> Sem '[Channels, Slack, Error Text] a -> Either Text a
+runGetPaginatedConst pages = runChannelsWith (nullSlackMatch {getPaginatedResponse = Just pages})
 
 data SlackResponse = SlackResponse
   { getResponse :: Maybe Text,

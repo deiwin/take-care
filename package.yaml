@@ -98,5 +98,6 @@ tests:
     - containers
     - text
     - aeson
+    - lens
     - bytestring
     - wreq

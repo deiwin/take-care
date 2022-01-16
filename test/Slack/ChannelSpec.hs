@@ -3,13 +3,16 @@
 module Slack.ChannelSpec (spec) where
 
 import Control.Category ((>>>))
-import Data.Aeson (Value, decode)
+import Control.Lens ((&), (^.))
+import Control.Monad (void)
+import Data.Aeson (Value (Null), decode)
 import Data.ByteString.Lazy (fromStrict)
-import Data.Function ((&))
+import Data.Functor (($>))
 import Data.Text (Text)
 import Data.Text.Encoding (encodeUtf8)
 import NeatInterpolation (trimming)
-import Polysemy (InterpreterFor, Member, Sem, interpret, run)
+import Network.Wreq (params)
+import Polysemy (Embed, InterpreterFor, Member, Sem, embed, interpret, run, runM)
 import Polysemy.Error (Error, note, runError)
 import Slack.Channel
   ( Channel (..),
@@ -19,15 +22,42 @@ import Slack.Channel
 import qualified Slack.Channel as Channels (find)
 import Slack.Util (Slack (..))
 import Test.Hspec
-  ( Spec,
+  ( Expectation,
+    Spec,
     describe,
+    expectationFailure,
     it,
     shouldBe,
+    shouldContain,
   )
 
 spec :: Spec
 spec = do
   describe "find" $ do
+    it "queries conversations.list" $ do
+      Channels.find "name"
+        & runWithExpectations \case
+          GetPaginated _ method -> method `shouldBe` "conversations.list"
+          _ -> expectationFailure "Expected a GetPaginated query"
+
+    it "sets response limit to 1000" $ do
+      Channels.find "name"
+        & runWithExpectations \case
+          GetPaginated opts _ -> opts ^. params `shouldContain` [("limit", "1000")]
+          _ -> expectationFailure "Expected a GetPaginated query"
+
+    it "excludes archived channels" $ do
+      Channels.find "name"
+        & runWithExpectations \case
+          GetPaginated opts _ -> opts ^. params `shouldContain` [("exclude_archived", "true")]
+          _ -> expectationFailure "Expected a GetPaginated query"
+
+    it "includes public and private channels" $ do
+      Channels.find "name"
+        & runWithExpectations \case
+          GetPaginated opts _ -> opts ^. params `shouldContain` [("types", "public_channel,private_channel")]
+          _ -> expectationFailure "Expected a GetPaginated query"
+
     it "fails on a response of an empty object" $ do
       Channels.find "whatever"
         & runGetPaginatedConst ["{}"]
@@ -143,6 +173,27 @@ spec = do
           |]
           ]
         & (`shouldBe` Right (Just (Channel {_id = "id", _name = "name", _topic = "topic"})))
+
+runWithExpectations ::
+  (forall rInitial x. (Slack (Sem rInitial) x -> IO ())) ->
+  Sem '[Channels, Slack, Error Text, Embed IO] a ->
+  Expectation
+runWithExpectations expectations =
+  runChannels
+    >>> runSlackWithExpectations
+    >>> runError
+    >>> runM
+    >>> void
+  where
+    runSlackWithExpectations :: Member (Embed IO) r => Sem (Slack ': r) a -> Sem r a
+    runSlackWithExpectations = interpret (embed . expecationWithNull)
+    -- Required to match the type expectation of interpret
+    expecationWithNull :: Slack (Sem rInitial) x -> IO x
+    expecationWithNull slackQuery =
+      case slackQuery of
+        Get _ _ -> expectations slackQuery $> Null
+        GetPaginated _ _ -> expectations slackQuery $> []
+        Post _ _ -> expectations slackQuery $> Null
 
 runGetPaginatedConst ::
   [Text] ->

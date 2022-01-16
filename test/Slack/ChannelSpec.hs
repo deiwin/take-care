@@ -34,131 +34,130 @@ spec = do
   describe "find" $ do
     it "fails on a response of an empty object" $ do
       Channels.find "whatever"
-        & runChannelsWith (constGetPaginated ["{}"])
+        & runGetPaginatedConst ["{}"]
         & (`shouldBe` Left "\"conversations.list\" response didn't include a \"channels\" field")
 
     it "retuns Nothing if the list of channels is empty" $ do
       Channels.find "whatever"
-        & runChannelsWith (constGetPaginated ["{\"channels\": []}"])
+        & runGetPaginatedConst ["{\"channels\": []}"]
         & (`shouldBe` Right Nothing)
 
     it "fails if channel object does not have an 'id' key" $ do
       Channels.find "whatever"
-        & runChannelsWith (constGetPaginated ["{\"channels\": [{}]}"])
+        & runGetPaginatedConst ["{\"channels\": [{}]}"]
         & (`shouldBe` Left "key \"id\" not found")
 
     it "fails if channel object does not have a 'name' key" $ do
       Channels.find "whatever"
-        & runChannelsWith (constGetPaginated ["{\"channels\": [{\"id\": \"something\"}]}"])
+        & runGetPaginatedConst ["{\"channels\": [{\"id\": \"something\"}]}"]
         & (`shouldBe` Left "key \"name\" not found")
 
     it "fails if channel object does not have a 'topic' key" $ do
       Channels.find "whatever"
-        & runChannelsWith
-          ( constGetPaginated
-              [ [trimming|
-                   {
-                     "channels": [{
-                       "id": "id",
-                       "name": "name"
-                     }]
-                   }
-                |]
-              ]
-          )
+        & runGetPaginatedConst
+          [ [trimming|
+            {
+                 "channels": [{
+                   "id": "id",
+                   "name": "name"
+                 }]
+               }
+            |]
+          ]
         & (`shouldBe` Left "key \"topic\" not found")
 
     it "fails if 'topic' key is not an object" $ do
       Channels.find "whatever"
-        & runChannelsWith
-          ( constGetPaginated
-              [ [trimming|
-                {
-                  "channels": [{
-                    "id": "id",
-                    "name": "name",
-                    "topic": "topic"
-                  }]
-                }
-              |]
-              ]
-          )
+        & runGetPaginatedConst
+          [ [trimming|
+            {
+              "channels": [{
+                "id": "id",
+                "name": "name",
+                "topic": "topic"
+              }]
+            }
+          |]
+          ]
         & (`shouldBe` Left "parsing HashMap ~Text failed, expected Object, but encountered String")
 
     it "fails if topic object does not have a 'value' key" $ do
       Channels.find "whatever"
-        & runChannelsWith
-          ( constGetPaginated
-              [ [trimming|
-                {
-                  "channels": [{
-                    "id": "id",
-                    "name": "name",
-                    "topic": {}
-                  }]
-                }
-              |]
-              ]
-          )
+        & runGetPaginatedConst
+          [ [trimming|
+            {
+              "channels": [{
+                "id": "id",
+                "name": "name",
+                "topic": {}
+              }]
+            }
+          |]
+          ]
         & (`shouldBe` Left "key \"value\" not found")
 
     it "returns Nothing if the channel ID doesn't match the query" $ do
       Channels.find "whatever"
-        & runChannelsWith
-          ( constGetPaginated
-              [ [trimming|
-                {
-                  "channels": [{
-                    "id": "id",
-                    "name": "name",
-                    "topic": {
-                      "value": "topic"
-                    }
-                  }]
+        & runGetPaginatedConst
+          [ [trimming|
+            {
+              "channels": [{
+                "id": "id",
+                "name": "name",
+                "topic": {
+                  "value": "topic"
                 }
-              |]
-              ]
-          )
+              }]
+            }
+          |]
+          ]
         & (`shouldBe` Right Nothing)
 
     it "returns the Channel object if name is a match" $ do
       Channels.find "name"
-        & runChannelsWith
-          ( constGetPaginated
-              [ [trimming|
-                {
-                  "channels": [{
-                    "id": "id",
-                    "name": "name",
-                    "topic": {
-                      "value": "topic"
-                    }
-                  }]
+        & runGetPaginatedConst
+          [ [trimming|
+            {
+              "channels": [{
+                "id": "id",
+                "name": "name",
+                "topic": {
+                  "value": "topic"
                 }
-              |]
-              ]
-          )
+              }]
+            }
+          |]
+          ]
         & (`shouldBe` Right (Just (Channel {_id = "id", _name = "name", _topic = "topic"})))
 
     it "returns the Channel object for a match on the second page" $ do
       Channels.find "name"
-        & runChannelsWith
-          ( constGetPaginated
-              [ "{\"channels\": []}",
-                [trimming|
-                {
-                  "channels": [{
-                    "id": "id",
-                    "name": "name",
-                    "topic": {
-                      "value": "topic"
-                    }
-                  }]
+        & runGetPaginatedConst
+          [ "{\"channels\": []}",
+            [trimming|
+              {
+              "channels": [{
+                "id": "id",
+                "name": "name",
+                "topic": {
+                  "value": "topic"
                 }
-              |]
-              ]
-          )
+              }]
+            }
+          |]
+          ]
         & (`shouldBe` Right (Just (Channel {_id = "id", _name = "name", _topic = "topic"})))
+
+runGetPaginatedConst ::
+  [Text] ->
+  Sem
+    '[ Channels,
+       Slack,
+       Error Text
+     ]
+    a ->
+  Either Text a
+runGetPaginatedConst pages = runChannelsWith (constGetPaginated pages)
 
 constGetPaginated :: [Text] -> SlackMatch
 constGetPaginated pages = nullSlackMatch {getPaginatedMatch = [const2 (Just pages)]}
@@ -173,7 +172,6 @@ data SlackMatch = SlackMatch
     getPaginatedMatch :: [Match Options [Text]],
     postMatch :: [Match [Pair] Text]
   }
-  deriving ()
 
 nullSlackMatch :: SlackMatch
 nullSlackMatch =

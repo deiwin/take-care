@@ -4,14 +4,11 @@ module Slack.ChannelSpec (spec) where
 
 import Control.Category ((>>>))
 import Data.Aeson (Value, decode)
-import Data.Aeson.Types (Pair)
 import Data.ByteString.Lazy (fromStrict)
 import Data.Function ((&))
-import Data.Maybe (listToMaybe, mapMaybe)
-import Data.Text (Text, pack)
+import Data.Text (Text)
 import Data.Text.Encoding (encodeUtf8)
 import NeatInterpolation (trimming)
-import Network.Wreq (Options)
 import Polysemy (InterpreterFor, Member, Sem, interpret, run)
 import Polysemy.Error (Error, note, runError)
 import Slack.Channel
@@ -27,7 +24,6 @@ import Test.Hspec
     it,
     shouldBe,
   )
-import Text.Printf (printf)
 
 spec :: Spec
 spec = do
@@ -159,30 +155,25 @@ runGetPaginatedConst ::
   Either Text a
 runGetPaginatedConst pages = runChannelsWith (constGetPaginated pages)
 
-constGetPaginated :: [Text] -> SlackMatch
-constGetPaginated pages = nullSlackMatch {getPaginatedMatch = [const2 (Just pages)]}
+constGetPaginated :: [Text] -> SlackResponse
+constGetPaginated pages = nullSlackMatch {getPaginatedResponse = Just pages}
 
-const2 :: a -> b -> c -> a
-const2 a _ _ = a
-
-type Match a b = a -> String -> Maybe b
-
-data SlackMatch = SlackMatch
-  { getMatch :: [Match Options Text],
-    getPaginatedMatch :: [Match Options [Text]],
-    postMatch :: [Match [Pair] Text]
+data SlackResponse = SlackResponse
+  { getResponse :: Maybe Text,
+    getPaginatedResponse :: Maybe [Text],
+    postResponse :: Maybe Text
   }
 
-nullSlackMatch :: SlackMatch
+nullSlackMatch :: SlackResponse
 nullSlackMatch =
-  SlackMatch
-    { getMatch = [],
-      getPaginatedMatch = [],
-      postMatch = []
+  SlackResponse
+    { getResponse = Nothing,
+      getPaginatedResponse = Nothing,
+      postResponse = Nothing
     }
 
 runChannelsWith ::
-  SlackMatch ->
+  SlackResponse ->
   Sem
     '[ Channels,
        Slack,
@@ -190,9 +181,9 @@ runChannelsWith ::
      ]
     a ->
   Either Text a
-runChannelsWith slackMatch =
+runChannelsWith slackResponse =
   runChannels
-    >>> runSlack slackMatch
+    >>> runSlack slackResponse
     >>> runError
     >>> run
 
@@ -203,23 +194,17 @@ json =
     >>> decode
     >>> note "failed to parse test JSON"
 
-runSlack :: Member (Error Text) r => SlackMatch -> InterpreterFor Slack r
-runSlack slackMatch = interpret \case
-  Get opts method ->
-    getMatch slackMatch
-      & mapMaybe (\m -> m opts method)
-      & listToMaybe
-      & note (pack (printf "No Get match found for opts: %s, method: %s" (show opts) method))
+runSlack :: Member (Error Text) r => SlackResponse -> InterpreterFor Slack r
+runSlack slackResponse = interpret \case
+  Get _ _ ->
+    getResponse slackResponse
+      & note "No response provided for Get"
       & (>>= json)
-  GetPaginated opts method ->
-    getPaginatedMatch slackMatch
-      & mapMaybe (\m -> m opts method)
-      & listToMaybe
-      & note (pack (printf "No GetPaginated match found for opts: %s, method: %s" (show opts) method))
+  GetPaginated _ _ ->
+    getPaginatedResponse slackResponse
+      & note "No response provided for GetPaginated"
       & (>>= traverse json)
-  Post opts method ->
-    postMatch slackMatch
-      & mapMaybe (\m -> m opts method)
-      & listToMaybe
-      & note (pack (printf "No Post match found for opts: %s, method: %s" (show opts) method))
+  Post _ _ ->
+    postResponse slackResponse
+      & note "No response provided for Post"
       & (>>= json)

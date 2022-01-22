@@ -1,5 +1,5 @@
 module Slack.User
-  ( User,
+  ( User (..),
     id,
     displayName,
     Users,
@@ -26,7 +26,7 @@ data User = User
   { _id :: Text,
     _displayName :: Text
   }
-  deriving (Generic, Show)
+  deriving (Generic, Show, Eq)
 
 $(makeLenses ''User)
 

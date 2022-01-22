@@ -95,7 +95,7 @@ findGroup expectedHandle = do
   groups <-
     traverse fromJSON
       . (^.. values)
-      =<< ((respBody ^? key "usergroups") & note "\"users.list\" response didn't include a \"channels\" field")
+      =<< ((respBody ^? key "usergroups") & note "\"usergroups.list\" response didn't include a \"usergroups\" field")
   return $ L.find (\x -> (x ^. handle) == expectedHandle) groups
 
 createGroup :: Members '[Slack, Error Text] r => Text -> Text -> [Text] -> Sem r Group

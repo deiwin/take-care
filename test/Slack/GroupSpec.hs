@@ -49,7 +49,7 @@ spec = do
     it "fails on a response of an empty object" $ do
       Groups.find "whatever"
         & runGetConst "{}"
-        & (`shouldBe` Left "\"users.list\" response didn't include a \"channels\" field")
+        & (`shouldBe` Left "\"usergroups.list\" response didn't include a \"usergroups\" field")
 
     it "retuns Nothing if the list of groups is empty" $ do
       Groups.find "whatever"

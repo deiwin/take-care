@@ -9,7 +9,10 @@ import Slack.Group
   ( Group (..),
     runGroups,
   )
-import qualified Slack.Group as Groups (find)
+import qualified Slack.Group as Groups
+  ( find,
+    getMembers,
+  )
 import Slack.TestUtils
   ( SlackResponse (..),
     nullSlackMatch,
@@ -143,6 +146,37 @@ spec = do
                     )
                 )
           )
+
+  describe "getMembers" $ do
+    it "queries usergroups.users.list" $ do
+      Groups.getMembers "id"
+        & runWithExpectations \case
+          Get _ method -> method `shouldBe` "usergroups.users.list"
+          _ -> expectationFailure "Expected a Get query"
+
+    it "specifies the group ID" $ do
+      let groupId = "group_id"
+      Groups.getMembers groupId
+        & runWithExpectations \case
+          Get opts _ -> opts ^. params `shouldContain` [("usergroup", groupId)]
+          _ -> expectationFailure "Expected a Get query"
+
+    it "includes disabled groups" $ do
+      Groups.getMembers "id"
+        & runWithExpectations \case
+          Get opts _ -> opts ^. params `shouldContain` [("include_disabled", "true")]
+          _ -> expectationFailure "Expected a Get query"
+
+    it "returns the list of user IDs if such usergroup does exist" $ do
+      Groups.getMembers "whatever"
+        & runGetConst
+          [trimming|
+          {
+            "ok": true,
+            "users": ["user1", "user2"]
+          }
+          |]
+        & (`shouldBe` Right ["user1", "user2"])
 
 runWithExpectations = runSlackWithExpectations runGroups
 

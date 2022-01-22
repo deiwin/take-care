@@ -10,7 +10,8 @@ import Slack.Group
     runGroups,
   )
 import qualified Slack.Group as Groups
-  ( find,
+  ( create,
+    find,
     getMembers,
     setChannels,
     setMembers,
@@ -227,6 +228,60 @@ spec = do
       Groups.setChannels "group_id" ["channel1", "channel2"]
         & runPostConst "{\"whatever\": {}}"
         & (`shouldBe` Right ())
+
+  describe "create" $ do
+    it "queries usergroups.create" $ do
+      Groups.create "group_handle" "Group Name" ["channel1", "channel2"]
+        & runWithExpectations \case
+          Post _ method -> method `shouldBe` "usergroups.create"
+          _ -> expectationFailure "Expected a Post query"
+
+    it "passes group handle paramater" $ do
+      Groups.create "group_handle" "Group Name" ["channel1", "channel2"]
+        & runWithExpectations \case
+          Post params _ -> params `shouldContain` [("handle", "group_handle")]
+          _ -> expectationFailure "Expected a Post query"
+
+    it "passes group name paramater" $ do
+      Groups.create "group_handle" "Group Name" ["channel1", "channel2"]
+        & runWithExpectations \case
+          Post params _ -> params `shouldContain` [("name", "Group Name")]
+          _ -> expectationFailure "Expected a Post query"
+
+    it "passes channel IDs as a comma-separated list" $ do
+      Groups.create "group_handle" "Group Name" ["channel1", "channel2"]
+        & runWithExpectations \case
+          Post params _ -> params `shouldContain` [("channels", "channel1,channel2")]
+          _ -> expectationFailure "Expected a Post query"
+
+    it "fails on a response of an empty object" $ do
+      Groups.create "group_handle" "Group Name" ["channel1", "channel2"]
+        & runPostConst "{}"
+        & (`shouldBe` Left "\"usergroups.create\" response didn't include a \"usergroup\" key")
+
+    it "returns the created group object" $ do
+      Groups.create "group_handle" "Group Name" ["channel1", "channel2"]
+        & runPostConst
+          [trimming|
+          {
+            "usergroup": {
+              "id": "group_id",
+              "handle": "group_handle",
+              "prefs": {
+                "channels": ["channel1", "channel2"]
+              }
+            }
+          }
+          |]
+        & ( `shouldBe`
+              Right
+                ( Group
+                    { _id = "group_id",
+                      _handle = "group_handle",
+                      _channelIDs = ["channel1", "channel2"]
+                    }
+                )
+          )
 
 runWithExpectations = runSlackWithExpectations runGroups
 

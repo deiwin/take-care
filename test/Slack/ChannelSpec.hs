@@ -78,11 +78,11 @@ spec = do
         & runGetPaginatedConst
           [ [trimming|
             {
-                 "channels": [{
-                   "id": "id",
-                   "name": "name"
-                 }]
-               }
+              "channels": [{
+                "id": "id",
+                "name": "name"
+              }]
+            }
             |]
           ]
         & (`shouldBe` Left "key \"topic\" not found")
@@ -157,14 +157,14 @@ spec = do
           [ "{\"channels\": []}",
             [trimming|
               {
-              "channels": [{
-                "id": "id",
-                "name": "name",
-                "topic": {
-                  "value": "topic"
-                }
-              }]
-            }
+                "channels": [{
+                  "id": "id",
+                  "name": "name",
+                  "topic": {
+                    "value": "topic"
+                  }
+                }]
+              }
           |]
           ]
         & (`shouldBe` Right (Just (Channel {_id = "id", _name = "name", _topic = "topic"})))

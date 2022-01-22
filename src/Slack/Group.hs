@@ -92,11 +92,14 @@ findGroup :: Members '[Slack, Error Text] r => Text -> Sem r (Maybe Group)
 findGroup expectedHandle = do
   let opts = defaults & param "include_disabled" .~ ["true"]
   respBody <- Slack.get opts "usergroups.list"
-  groups <-
-    traverse fromJSON
-      . (^.. values)
-      =<< ((respBody ^? key "usergroups") & note "\"usergroups.list\" response didn't include a \"usergroups\" field")
-  return $ L.find (\x -> (x ^. handle) == expectedHandle) groups
+  groupListBody <-
+    respBody
+      & (^? key "usergroups")
+      & note "\"usergroups.list\" response didn't include a \"usergroups\" field"
+  groupListBody
+    & (^.. values)
+    & traverse fromJSON
+    & fmap (L.find (\x -> (x ^. handle) == expectedHandle))
 
 createGroup :: Members '[Slack, Error Text] r => Text -> Text -> [Text] -> Sem r Group
 createGroup groupHandle groupName defaultChannelIDs = do

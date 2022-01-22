@@ -2,7 +2,7 @@ module Slack.User
   ( User (..),
     id,
     displayName,
-    Users,
+    Users (..),
     listAll,
     runUsers,
   )

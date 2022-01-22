@@ -2,28 +2,23 @@
 
 module Slack.ChannelSpec (spec) where
 
-import Control.Category ((>>>))
 import Control.Lens ((&), (^.))
-import Control.Monad (void)
-import Data.Aeson (Value (Null), decode)
-import Data.ByteString.Lazy (fromStrict)
-import Data.Functor (($>))
-import Data.Text (Text)
-import Data.Text.Encoding (encodeUtf8)
 import NeatInterpolation (trimming)
 import Network.Wreq (params)
-import Polysemy (Embed, InterpreterFor, Member, Sem, embed, interpret, run, runM)
-import Polysemy.Error (Error, note, runError)
 import Slack.Channel
   ( Channel (..),
-    Channels,
     runChannels,
   )
 import qualified Slack.Channel as Channels (create, find, setTopic)
+import Slack.TestUtils
+  ( SlackResponse (..),
+    nullSlackMatch,
+    runSlackWith,
+    runSlackWithExpectations,
+  )
 import Slack.Util (Slack (..))
 import Test.Hspec
-  ( Expectation,
-    Spec,
+  ( Spec,
     describe,
     expectationFailure,
     it,
@@ -237,80 +232,8 @@ spec = do
         & runPostConst "{\"whatever\": {}}"
         & (`shouldBe` Right ())
 
-runWithExpectations ::
-  (forall rInitial x. (Slack (Sem rInitial) x -> IO ())) ->
-  Sem '[Channels, Slack, Error Text, Embed IO] a ->
-  Expectation
-runWithExpectations expectations =
-  runChannels
-    >>> runSlackWithExpectations
-    >>> runError
-    >>> runM
-    >>> void
-  where
-    runSlackWithExpectations :: Member (Embed IO) r => Sem (Slack ': r) a -> Sem r a
-    runSlackWithExpectations = interpret (embed . expecationWithNull)
-    -- Required to match the type expectation of interpret
-    expecationWithNull :: Slack (Sem rInitial) x -> IO x
-    expecationWithNull slackQuery =
-      case slackQuery of
-        Get _ _ -> expectations slackQuery $> Null
-        GetPaginated _ _ -> expectations slackQuery $> []
-        Post _ _ -> expectations slackQuery $> Null
+runWithExpectations = runSlackWithExpectations runChannels
 
-runPostConst :: Text -> Sem '[Channels, Slack, Error Text] a -> Either Text a
-runPostConst page = runChannelsWith (nullSlackMatch {postResponse = Just page})
+runPostConst page = runSlackWith runChannels (nullSlackMatch {postResponse = Just page})
 
-runGetPaginatedConst :: [Text] -> Sem '[Channels, Slack, Error Text] a -> Either Text a
-runGetPaginatedConst pages = runChannelsWith (nullSlackMatch {getPaginatedResponse = Just pages})
-
-data SlackResponse = SlackResponse
-  { getResponse :: Maybe Text,
-    getPaginatedResponse :: Maybe [Text],
-    postResponse :: Maybe Text
-  }
-
-nullSlackMatch :: SlackResponse
-nullSlackMatch =
-  SlackResponse
-    { getResponse = Nothing,
-      getPaginatedResponse = Nothing,
-      postResponse = Nothing
-    }
-
-runChannelsWith ::
-  SlackResponse ->
-  Sem
-    '[ Channels,
-       Slack,
-       Error Text
-     ]
-    a ->
-  Either Text a
-runChannelsWith slackResponse =
-  runChannels
-    >>> runSlack slackResponse
-    >>> runError
-    >>> run
-
-json :: Member (Error Text) r => Text -> Sem r Value
-json =
-  encodeUtf8
-    >>> fromStrict
-    >>> decode
-    >>> note "failed to parse test JSON"
-
-runSlack :: Member (Error Text) r => SlackResponse -> InterpreterFor Slack r
-runSlack slackResponse = interpret \case
-  Get _ _ ->
-    getResponse slackResponse
-      & note "No response provided for Get"
-      & (>>= json)
-  GetPaginated _ _ ->
-    getPaginatedResponse slackResponse
-      & note "No response provided for GetPaginated"
-      & (>>= traverse json)
-  Post _ _ ->
-    postResponse slackResponse
-      & note "No response provided for Post"
-      & (>>= json)
+runGetPaginatedConst pages = runSlackWith runChannels (nullSlackMatch {getPaginatedResponse = Just pages})

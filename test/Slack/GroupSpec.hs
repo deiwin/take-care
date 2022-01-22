@@ -12,6 +12,7 @@ import Slack.Group
 import qualified Slack.Group as Groups
   ( find,
     getMembers,
+    setMembers,
   )
 import Slack.TestUtils
   ( SlackResponse (..),
@@ -178,6 +179,32 @@ spec = do
           |]
         & (`shouldBe` Right ["user1", "user2"])
 
+  describe "setMembers" $ do
+    it "queries usergroups.users.update" $ do
+      Groups.setMembers "group_id" ["alice", "bob"]
+        & runWithExpectations \case
+          Post _ method -> method `shouldBe` "usergroups.users.update"
+          _ -> expectationFailure "Expected a Post query"
+
+    it "passes group ID paramater" $ do
+      Groups.setMembers "group_id" ["alice", "bob"]
+        & runWithExpectations \case
+          Post params _ -> params `shouldContain` [("usergroup", "group_id")]
+          _ -> expectationFailure "Expected a Post query"
+
+    it "passes user IDs as a comma-separated list" $ do
+      Groups.setMembers "group_id" ["alice", "bob"]
+        & runWithExpectations \case
+          Post params _ -> params `shouldContain` [("users", "alice,bob")]
+          _ -> expectationFailure "Expected a Post query"
+
+    it "ignores response body" $ do
+      Groups.setMembers "group_id" ["alice", "bob"]
+        & runPostConst "{\"whatever\": {}}"
+        & (`shouldBe` Right ())
+
 runWithExpectations = runSlackWithExpectations runGroups
+
+runPostConst page = runSlackWith runGroups (nullSlackMatch {postResponse = Just page})
 
 runGetConst page = runSlackWith runGroups (nullSlackMatch {getResponse = Just page})

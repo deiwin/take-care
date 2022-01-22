@@ -1,5 +1,5 @@
 module Slack.Group
-  ( Group,
+  ( Group (..),
     id,
     handle,
     channelIDs,
@@ -33,7 +33,7 @@ data Group = Group
     _handle :: Text,
     _channelIDs :: [Text]
   }
-  deriving (Generic, Show)
+  deriving (Generic, Show, Eq)
 
 $(makeLenses ''Group)
 

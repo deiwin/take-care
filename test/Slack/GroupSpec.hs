@@ -12,6 +12,7 @@ import Slack.Group
 import qualified Slack.Group as Groups
   ( find,
     getMembers,
+    setChannels,
     setMembers,
   )
 import Slack.TestUtils
@@ -200,6 +201,30 @@ spec = do
 
     it "ignores response body" $ do
       Groups.setMembers "group_id" ["alice", "bob"]
+        & runPostConst "{\"whatever\": {}}"
+        & (`shouldBe` Right ())
+
+  describe "setChannels" $ do
+    it "queries usergroups.update" $ do
+      Groups.setChannels "group_id" ["channel1", "channel2"]
+        & runWithExpectations \case
+          Post _ method -> method `shouldBe` "usergroups.update"
+          _ -> expectationFailure "Expected a Post query"
+
+    it "passes group ID paramater" $ do
+      Groups.setChannels "group_id" ["channel1", "channel2"]
+        & runWithExpectations \case
+          Post params _ -> params `shouldContain` [("usergroup", "group_id")]
+          _ -> expectationFailure "Expected a Post query"
+
+    it "passes channel IDs as a comma-separated list" $ do
+      Groups.setChannels "group_id" ["channel1", "channel2"]
+        & runWithExpectations \case
+          Post params _ -> params `shouldContain` [("channels", "channel1,channel2")]
+          _ -> expectationFailure "Expected a Post query"
+
+    it "ignores response body" $ do
+      Groups.setChannels "group_id" ["channel1", "channel2"]
         & runPostConst "{\"whatever\": {}}"
         & (`shouldBe` Right ())
 

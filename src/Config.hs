@@ -8,7 +8,7 @@ module Config
     showDesiredTeamStateList,
 
     -- * Effect
-    Config,
+    Config (..),
     runConfig,
     parse,
   )

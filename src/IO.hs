@@ -5,7 +5,7 @@ module IO
     lookup,
 
     -- * Time effect
-    Time,
+    Time (..),
     runTime,
     getCurrent,
   )

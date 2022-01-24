@@ -1,5 +1,3 @@
-{-# LANGUAGE QuasiQuotes #-}
-
 module ReadmeSpec (spec) where
 
 import Config

@@ -12,7 +12,7 @@ RUN stack test
  && stack install ormolu
  && ormolu --mode check $(find src app test -name '*.hs')
 
-FROM debian:10.9
+FROM debian:11.3
 
 ENV LANG C.UTF-8
 ENV LC_ALL C.UTF-8

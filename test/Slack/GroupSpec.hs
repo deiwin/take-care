@@ -92,7 +92,7 @@ spec = do
             }]
           }
           |]
-        & (`shouldBe` Left "parsing HashMap ~Text failed, expected Object, but encountered String")
+        & (`shouldBe` Left "parsing KeyMap failed, expected Object, but encountered String")
 
     it "fails if prefs object does not have a 'channels' key" $ do
       Groups.find "whatever"

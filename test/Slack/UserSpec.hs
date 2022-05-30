@@ -80,7 +80,7 @@ spec = do
             }
           |]
           ]
-        & (`shouldBe` Left "parsing HashMap ~Text failed, expected Object, but encountered String")
+        & (`shouldBe` Left "parsing KeyMap failed, expected Object, but encountered String")
 
     it "uses 'name' field if profile object does not have a 'display_name' key" $ do
       Users.listAll

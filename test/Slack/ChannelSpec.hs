@@ -100,7 +100,7 @@ spec = do
             }
           |]
           ]
-        & (`shouldBe` Left "parsing HashMap ~Text failed, expected Object, but encountered String")
+        & (`shouldBe` Left "parsing KeyMap failed, expected Object, but encountered String")
 
     it "fails if topic object does not have a 'value' key" $ do
       Channels.find "whatever"

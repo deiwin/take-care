@@ -1,20 +1,20 @@
 module Slack.Channel
   ( Channel (..),
     id,
+    name,
     topic,
     Channels,
     create,
-    find,
     setTopic,
+    listAll,
     runChannels,
   )
 where
 
-import Control.Lens ((&), (.~), (^.), (^..), (^?))
+import Control.Lens ((&), (.~), (^..), (^?))
 import Control.Lens.TH (makeLenses)
 import Data.Aeson (FromJSON (parseJSON), withObject, (.:), (.=))
 import Data.Aeson.Lens (key, values)
-import qualified Data.List as L (find)
 import Data.Text (Text)
 import GHC.Generics (Generic)
 import Network.Wreq (defaults, param)
@@ -42,20 +42,20 @@ instance FromJSON Channel where
     return Channel {..}
 
 data Channels m a where
-  Find :: Text -> Channels m (Maybe Channel)
   Create :: Text -> Channels m Channel
   SetTopic :: Text -> Text -> Channels m ()
+  ListAll :: Channels m [Channel]
 
 makeSem ''Channels
 
 runChannels :: Members '[Slack, Error Text] r => InterpreterFor Channels r
 runChannels = interpret \case
-  Find name -> findChannel name
   Create name -> createChannel name
   SetTopic id topic -> setChannelTopic id topic
+  ListAll -> listAllChannels
 
-findChannel :: Members '[Slack, Error Text] r => Text -> Sem r (Maybe Channel)
-findChannel expectedName = do
+listAllChannels :: Members '[Slack, Error Text] r => Sem r [Channel]
+listAllChannels = do
   let params =
         defaults & param "types" .~ ["public_channel,private_channel"]
           & param "exclude_archived" .~ ["true"]
@@ -68,7 +68,6 @@ findChannel expectedName = do
   channelBodies
     & concatMap (^.. values)
     & traverse fromJSON
-    & fmap (L.find (\x -> (x ^. name) == expectedName))
 
 createChannel :: Members '[Slack, Error Text] r => Text -> Sem r Channel
 createChannel newName = do

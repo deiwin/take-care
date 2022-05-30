@@ -35,10 +35,11 @@ import Slack.Channel as Channel
   ( Channel,
     Channels,
     id,
+    name,
     runChannels,
     topic,
   )
-import qualified Slack.Channel as Channels (create, find, setTopic)
+import qualified Slack.Channel as Channels (create, listAll, setTopic)
 import Slack.Group as Group
   ( Groups,
     channelIDs,
@@ -67,6 +68,8 @@ import Prelude hiding (filter, unlines)
 newtype GetDisplayName = GetDisplayName
   { unGetDisplayName :: forall r. Member (Error Text) r => Text -> Sem r Text
   }
+
+type FindChannel = Text -> Maybe Channel
 
 type CanonicalEffects =
   '[ Time,
@@ -109,7 +112,8 @@ ensure ::
 ensure inputText = do
   records <- Config.parse inputText
   getDisplayName <- getDisplayNameM
-  teamResults <- traverse (wrapTeamResult $ ensureTeamState getDisplayName) records
+  findChannel <- findChannelM
+  teamResults <- traverse (wrapTeamResult $ ensureTeamState getDisplayName findChannel) records
   return $ unlines teamResults
   where
     wrapTeamResult f record = ("Team " <> team record <> ": success!") <$ f record
@@ -141,12 +145,13 @@ ensureTeamState ::
     Member Groups r
   ) =>
   GetDisplayName ->
+  FindChannel ->
   Team ->
   Sem r ()
-ensureTeamState getDisplayName record = do
+ensureTeamState getDisplayName findChannel record = do
   time <- Time.getCurrent
   let desiredTeamState = currentDesiredTeamState time record
-  channel <- findOrCreateChannel $ teamChannelName desiredTeamState
+  channel <- findOrCreateChannel findChannel $ teamChannelName desiredTeamState
   ensureChannelTopic getDisplayName channel desiredTeamState
   let channelID = channel ^. Channel.id
   traverse_ (ensureGroupState [channelID]) $ groupList desiredTeamState
@@ -169,10 +174,12 @@ ensureChannelTopic getDisplayName channel desiredTeamState = do
     clean = filter (not . potentialAddedChar)
     potentialAddedChar c = c `elem` ['<', '>']
 
-findOrCreateChannel :: Member Channels r => Text -> Sem r Channel
-findOrCreateChannel name = do
-  current <- Channels.find name
-  maybe (Channels.create name) return current
+findOrCreateChannel ::
+  Member Channels r =>
+  FindChannel ->
+  Text ->
+  Sem r Channel
+findOrCreateChannel findChannel name = maybe (Channels.create name) return (findChannel name)
 
 ensureGroupState :: Member Groups r => [Text] -> Group -> Sem r ()
 ensureGroupState defaultChannelIDs group = do
@@ -196,6 +203,13 @@ getDisplayNameM = do
   where
     lookup map id = Map.lookup id map & note (pack (printf "Could not find user with ID: %s" id))
     toPair user = (user ^. User.id, user ^. displayName)
+
+findChannelM :: Member Channels r => Sem r FindChannel
+findChannelM = do
+  map <- Map.fromList . fmap toPair <$> Channels.listAll
+  return (`Map.lookup` map)
+  where
+    toPair channel = (channel ^. Channel.name, channel)
 
 infixl 4 <<$>>
 

@@ -9,7 +9,7 @@ import Slack.Channel
   ( Channel (..),
     runChannels,
   )
-import qualified Slack.Channel as Channels (create, find, setTopic)
+import qualified Slack.Channel as Channels (create, listAll, setTopic)
 import Slack.TestUtils
   ( SlackResponse (..),
     nullSlackMatch,
@@ -28,53 +28,53 @@ import Test.Hspec
 
 spec :: Spec
 spec = do
-  describe "find" $ do
+  describe "listAll" $ do
     it "queries conversations.list" $ do
-      Channels.find "name"
+      Channels.listAll
         & runWithExpectations \case
           GetPaginated _ method -> method `shouldBe` "conversations.list"
           _ -> expectationFailure "Expected a GetPaginated query"
 
     it "sets response limit to 1000" $ do
-      Channels.find "name"
+      Channels.listAll
         & runWithExpectations \case
           GetPaginated opts _ -> opts ^. params `shouldContain` [("limit", "1000")]
           _ -> expectationFailure "Expected a GetPaginated query"
 
     it "excludes archived channels" $ do
-      Channels.find "name"
+      Channels.listAll
         & runWithExpectations \case
           GetPaginated opts _ -> opts ^. params `shouldContain` [("exclude_archived", "true")]
           _ -> expectationFailure "Expected a GetPaginated query"
 
     it "includes public and private channels" $ do
-      Channels.find "name"
+      Channels.listAll
         & runWithExpectations \case
           GetPaginated opts _ -> opts ^. params `shouldContain` [("types", "public_channel,private_channel")]
           _ -> expectationFailure "Expected a GetPaginated query"
 
     it "fails on a response of an empty object" $ do
-      Channels.find "whatever"
+      Channels.listAll
         & runGetPaginatedConst ["{}"]
         & (`shouldBe` Left "\"conversations.list\" response didn't include a \"channels\" field")
 
     it "retuns Nothing if the list of channels is empty" $ do
-      Channels.find "whatever"
+      Channels.listAll
         & runGetPaginatedConst ["{\"channels\": []}"]
-        & (`shouldBe` Right Nothing)
+        & (`shouldBe` Right [])
 
     it "fails if channel object does not have an 'id' key" $ do
-      Channels.find "whatever"
+      Channels.listAll
         & runGetPaginatedConst ["{\"channels\": [{}]}"]
         & (`shouldBe` Left "key \"id\" not found")
 
     it "fails if channel object does not have a 'name' key" $ do
-      Channels.find "whatever"
+      Channels.listAll
         & runGetPaginatedConst ["{\"channels\": [{\"id\": \"something\"}]}"]
         & (`shouldBe` Left "key \"name\" not found")
 
     it "fails if channel object does not have a 'topic' key" $ do
-      Channels.find "whatever"
+      Channels.listAll
         & runGetPaginatedConst
           [ [trimming|
             {
@@ -88,7 +88,7 @@ spec = do
         & (`shouldBe` Left "key \"topic\" not found")
 
     it "fails if 'topic' key is not an object" $ do
-      Channels.find "whatever"
+      Channels.listAll
         & runGetPaginatedConst
           [ [trimming|
             {
@@ -103,7 +103,7 @@ spec = do
         & (`shouldBe` Left "parsing KeyMap failed, expected Object, but encountered String")
 
     it "fails if topic object does not have a 'value' key" $ do
-      Channels.find "whatever"
+      Channels.listAll
         & runGetPaginatedConst
           [ [trimming|
             {
@@ -117,8 +117,8 @@ spec = do
           ]
         & (`shouldBe` Left "key \"value\" not found")
 
-    it "returns Nothing if the channel ID doesn't match the query" $ do
-      Channels.find "whatever"
+    it "returns the channels in the response" $ do
+      Channels.listAll
         & runGetPaginatedConst
           [ [trimming|
             {
@@ -132,42 +132,40 @@ spec = do
             }
           |]
           ]
-        & (`shouldBe` Right Nothing)
+        & (`shouldBe` Right [Channel {_id = "id", _name = "name", _topic = "topic"}])
 
-    it "returns the Channel object if name is a match" $ do
-      Channels.find "name"
+    it "returns the channels on multiple pages second page" $ do
+      Channels.listAll
         & runGetPaginatedConst
           [ [trimming|
-            {
-              "channels": [{
-                "id": "id",
-                "name": "name",
-                "topic": {
-                  "value": "topic"
-                }
-              }]
-            }
-          |]
-          ]
-        & (`shouldBe` Right (Just (Channel {_id = "id", _name = "name", _topic = "topic"})))
-
-    it "returns the Channel object for a match on the second page" $ do
-      Channels.find "name"
-        & runGetPaginatedConst
-          [ "{\"channels\": []}",
-            [trimming|
               {
                 "channels": [{
-                  "id": "id",
-                  "name": "name",
+                  "id": "id1",
+                  "name": "page1_channel",
                   "topic": {
-                    "value": "topic"
+                    "value": "topic1"
                   }
                 }]
               }
-          |]
+            |],
+            [trimming|
+              {
+                "channels": [{
+                  "id": "id2",
+                  "name": "page2_channel",
+                  "topic": {
+                    "value": "topic2"
+                  }
+                }]
+              }
+            |]
           ]
-        & (`shouldBe` Right (Just (Channel {_id = "id", _name = "name", _topic = "topic"})))
+        & ( `shouldBe`
+              Right
+                [ Channel {_id = "id1", _name = "page1_channel", _topic = "topic1"},
+                  Channel {_id = "id2", _name = "page2_channel", _topic = "topic2"}
+                ]
+          )
 
   describe "create" $ do
     it "posts to conversations.create" $ do

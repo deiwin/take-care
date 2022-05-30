@@ -10,7 +10,7 @@ FROM builder as test
 
 RUN stack test \
  && stack install ormolu \
- && ormolu --mode check $(find src app test -name '*.hs')
+ && ormolu --cabal-default-extensions --mode check $(find src app test -name '*.hs')
 
 FROM debian:11.3
 

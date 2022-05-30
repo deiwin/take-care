@@ -2,6 +2,8 @@
 
 ## Unreleased changes
 
+## v0.5.0
+
 * Change `list-caretakers` command to be `ensure --dry-run` instead. Also
   update the output to show everything that the `ensure` command would
   _ensure_.

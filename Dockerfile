@@ -8,8 +8,8 @@ RUN stack -j "$(nproc)" --system-ghc build --copy-bins
 
 FROM builder as test
 
-RUN stack test
- && stack install ormolu
+RUN stack test \
+ && stack install ormolu \
  && ormolu --mode check $(find src app test -name '*.hs')
 
 FROM debian:11.3

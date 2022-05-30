@@ -58,7 +58,7 @@ spec = do
         & runGetPaginatedConst ["{}"]
         & (`shouldBe` Left "\"conversations.list\" response didn't include a \"channels\" field")
 
-    it "retuns Nothing if the list of channels is empty" $ do
+    it "retuns an empty list if the list of channels is empty" $ do
       Channels.listAll
         & runGetPaginatedConst ["{\"channels\": []}"]
         & (`shouldBe` Right [])
@@ -134,7 +134,7 @@ spec = do
           ]
         & (`shouldBe` Right [Channel {_id = "id", _name = "name", _topic = "topic"}])
 
-    it "returns the channels on multiple pages second page" $ do
+    it "returns the channels on multiple pages" $ do
       Channels.listAll
         & runGetPaginatedConst
           [ [trimming|

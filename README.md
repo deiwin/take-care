@@ -63,34 +63,35 @@ according to your needs. The configuration is written in [Dhall][3],
 a programmable configuration language with Haskell-like syntax.
 
 ```haskell
-[ { members = { caretakers = [[ "U111ALICE" -- Alice
-                              , "U22222BOB" -- Bob
-                              , "U333CAROL" -- Carol
-                              ]
+let Team = ./src/Team.dhall
+ in [ { members = { caretakers = [[ "U111ALICE" -- Alice
+                                  , "U22222BOB" -- Bob
+                                  , "U333CAROL" -- Carol
+                                  ]
+                                 ]
+                  , others = [ "U4444DAVE" -- Dave
                              ]
-              , others = [ "U4444DAVE" -- Dave
-                         ]
-              }
-  , team = "design"
-  , topic = \(caretaker : Text) ->
-       let standup   = "Stand-up *9:30*"
-    in let board     = "Board :incoming_envelope: https://team.board/url"
-    in let separator = ":paw_prints:"
-    in "${standup} ${separator} ${board} ${separator} Caretaker ${caretaker}"
-  }
-, { members = { caretakers = [[ "U55555EVE" -- Eve
-                              , "U6666FAYE" -- Faye
-                              ]
-                             ,[ "U77777GIL" -- Gil
-                              , "U88888HAL" -- Hal
-                              ]
-                             ]
-              , others = [] : List Text
-              }
-  , team = "dev"
-  , topic = \(caretakers : Text) -> "${caretakers} are the caretakers"
-  }
-]
+                  }
+      , team = "design"
+      , topic = \(caretaker : Text) ->
+           let standup   = "Stand-up *9:30*"
+        in let board     = "Board :incoming_envelope: https://team.board/url"
+        in let separator = ":paw_prints:"
+        in "${standup} ${separator} ${board} ${separator} Caretaker ${caretaker}"
+      }
+    , { members = { caretakers = [[ "U55555EVE" -- Eve
+                                  , "U6666FAYE" -- Faye
+                                  ]
+                                 ,[ "U77777GIL" -- Gil
+                                  , "U88888HAL" -- Hal
+                                  ]
+                                 ]
+                  , others = [] : List Text
+                  }
+      , team = "dev"
+      , topic = \(caretakers : Text) -> "${caretakers} are the caretakers"
+      }
+    ] : List Team
 ```
 
 Verify the configuration with the `--dry-run` flag for the `ensure`

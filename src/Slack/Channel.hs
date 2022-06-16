@@ -3,7 +3,7 @@ module Slack.Channel
     id,
     name,
     topic,
-    Channels,
+    Channels (..),
     create,
     setTopic,
     listAll,

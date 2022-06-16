@@ -3,7 +3,7 @@ module Slack.Group
     id,
     handle,
     channelIDs,
-    Groups,
+    Groups (..),
     runGroups,
     getMembers,
     setMembers,

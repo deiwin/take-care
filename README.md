@@ -63,35 +63,78 @@ according to your needs. The configuration is written in [Dhall][3],
 a programmable configuration language with Haskell-like syntax.
 
 ```haskell
-let Team = ./src/Team.dhall
- in [ { members = { caretakers = [[ "U111ALICE" -- Alice
-                                  , "U22222BOB" -- Bob
-                                  , "U333CAROL" -- Carol
-                                  ]
-                                 ]
-                  , others = [ "U4444DAVE" -- Dave
-                             ]
-                  }
-      , team = "design"
-      , topic = \(caretaker : Text) ->
-           let standup   = "Stand-up *9:30*"
-        in let board     = "Board :incoming_envelope: https://team.board/url"
-        in let separator = ":paw_prints:"
-        in "${standup} ${separator} ${board} ${separator} Caretaker ${caretaker}"
+let Conf = ./src/Conf.dhall
+let concat = https://raw.githubusercontent.com/dhall-lang/dhall-lang/v21.1.0/Prelude/List/concat.dhall
+let concatMap = https://raw.githubusercontent.com/dhall-lang/dhall-lang/v21.1.0/Prelude/List/concatMap.dhall
+let concatSep = https://raw.githubusercontent.com/dhall-lang/dhall-lang/v21.1.0/Prelude/Text/concatSep.dhall
+
+let TeamArgs =
+      { name : Text
+      , members : { caretakers : List (List Text), others : List Text }
+      , topic : Text -> Text
       }
-    , { members = { caretakers = [[ "U55555EVE" -- Eve
-                                  , "U6666FAYE" -- Faye
-                                  ]
-                                 ,[ "U77777GIL" -- Gil
-                                  , "U88888HAL" -- Hal
-                                  ]
-                                 ]
-                  , others = [] : List Text
-                  }
-      , team = "dev"
-      , topic = \(caretakers : Text) -> "${caretakers} are the caretakers"
-      }
-    ] : List Team
+
+let team =
+      \(args : TeamArgs) ->
+        let channelName = "tm-${args.name}"
+
+        let allMembers =
+              concat
+                Text
+                [ concat Text args.members.caretakers, args.members.others ]
+
+        in    [ { rotation = Rotation.Weekly args.members.caretakers
+                , effects =
+                  [ Effect.SetSlackChannelTopic
+                      { name = channelName
+                      , topic =
+                          \(caretakers : List Text) ->
+                            args.topic (concatSep ", " caretakers)
+                      }
+                  , Effect.SetSlackGroup "${args.name}-caretaker"
+                  ]
+                }
+              , { rotation = Rotation.Const allMembers
+                , effects =
+                  [ Effect.InviteToSlackChannel channelName
+                  , Effect.SetSlackGroup "${args.name}-team"
+                  ]
+                }
+              ]
+            : List Conf
+
+let teams = concatMap TeamArgs Conf team
+
+ in teams
+      [ { members = { caretakers = [[ "U111ALICE" -- Alice
+                                    , "U22222BOB" -- Bob
+                                    , "U333CAROL" -- Carol
+                                    ]
+                                   ]
+                    , others = [ "U4444DAVE" -- Dave
+                               ]
+                    }
+        , name = "design"
+        , topic = \(caretaker : Text) ->
+             let standup   = "Stand-up *9:30*"
+          in let board     = "Board :incoming_envelope: https://team.board/url"
+          in let separator = ":paw_prints:"
+          in "${standup} ${separator} ${board} ${separator} Caretaker ${caretaker}"
+        }
+      , { members = { caretakers = [[ "U55555EVE" -- Eve
+                                    , "U6666FAYE" -- Faye
+                                    ]
+                                   ,[ "U77777GIL" -- Gil
+                                    , "U88888HAL" -- Hal
+                                    ]
+                                   ]
+                    , others = [] : List Text
+                    }
+        , name = "dev"
+        , topic = \(caretakers : Text) -> "${caretakers} are the caretakers"
+        }
+      ]
+    : List Conf
 ```
 
 Verify the configuration with the `--dry-run` flag for the `ensure`

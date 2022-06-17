@@ -1,3 +1,9 @@
+{-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE TemplateHaskell    #-}
+
 module Config
   ( Members (..),
     Team (..),
@@ -14,13 +20,17 @@ module Config
   )
 where
 
+import Effect (Effect (..))
+
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Text (Text, intercalate, lines, pack, replicate)
 import Data.Time.Calendar.WeekDate (toWeekDate)
 import Data.Time.Clock (UTCTime (..))
 import Dhall (FromDhall)
+import Dhall.TH (makeHaskellTypes, HaskellType (..))
 import qualified Dhall (auto, input)
+import Effect
 import GHC.Generics (Generic)
 import Polysemy (Embed, InterpreterFor, Member, embed, interpret, makeSem)
 import Text.Printf (printf)
@@ -35,13 +45,25 @@ data Members = Members
 instance FromDhall Members
 
 data Team = Team
-  { members :: Members,
-    team :: Text, -- TODO should be max 21 chars with the tm- prefix, so 18
+  { name :: Text,
+    members :: Members,
     topic :: Text -> Text
   }
   deriving (Generic)
 
 instance FromDhall Team
+
+Dhall.TH.makeHaskellTypes
+    [ MultipleConstructors "Rotation" "./src/Rotation.dhall"
+    ]
+
+data Conf = Conf
+  { rotation :: Rotation,
+    effects :: [Effect]
+  }
+  deriving (Generic)
+
+instance FromDhall Conf
 
 data Group = Group
   { handle :: Text,
@@ -58,7 +80,7 @@ data DesiredTeamState = DesiredTeamState
   }
 
 data Config m a where
-  Parse :: Text -> Config m [Team]
+  Parse :: Text -> Config m [Conf]
 
 makeSem ''Config
 
@@ -128,7 +150,7 @@ currentDesiredTeamState time team =
           description = "Team " <> teamName,
           memberIDs = Set.fromList $ others (members team) ++ concat (Config.caretakers $ members team)
         }
-    teamName = Config.team team
+    teamName = Config.name team
 
 currentCaretakerList :: UTCTime -> Team -> [Text]
 currentCaretakerList time team = currentCaretaker time <$> caretakers (members team)

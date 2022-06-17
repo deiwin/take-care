@@ -63,10 +63,20 @@ according to your needs. The configuration is written in [Dhall][3],
 a programmable configuration language with Haskell-like syntax.
 
 ```haskell
+let Rotation = ./src/Rotation.dhall
+
+let Effect = ./src/Effect.dhall
+
 let Conf = ./src/Conf.dhall
-let concat = https://raw.githubusercontent.com/dhall-lang/dhall-lang/v21.1.0/Prelude/List/concat.dhall
-let concatMap = https://raw.githubusercontent.com/dhall-lang/dhall-lang/v21.1.0/Prelude/List/concatMap.dhall
-let concatSep = https://raw.githubusercontent.com/dhall-lang/dhall-lang/v21.1.0/Prelude/Text/concatSep.dhall
+
+let concat =
+      https://raw.githubusercontent.com/dhall-lang/dhall-lang/v21.1.0/Prelude/List/concat.dhall
+
+let concatMap =
+      https://raw.githubusercontent.com/dhall-lang/dhall-lang/v21.1.0/Prelude/List/concatMap.dhall
+
+let concatSep =
+      https://raw.githubusercontent.com/dhall-lang/dhall-lang/v21.1.0/Prelude/Text/concatSep.dhall
 
 let TeamArgs =
       { name : Text
@@ -105,35 +115,31 @@ let team =
 
 let teams = concatMap TeamArgs Conf team
 
- in teams
-      [ { members = { caretakers = [[ "U111ALICE" -- Alice
-                                    , "U22222BOB" -- Bob
-                                    , "U333CAROL" -- Carol
-                                    ]
-                                   ]
-                    , others = [ "U4444DAVE" -- Dave
-                               ]
-                    }
-        , name = "design"
-        , topic = \(caretaker : Text) ->
-             let standup   = "Stand-up *9:30*"
-          in let board     = "Board :incoming_envelope: https://team.board/url"
-          in let separator = ":paw_prints:"
-          in "${standup} ${separator} ${board} ${separator} Caretaker ${caretaker}"
-        }
-      , { members = { caretakers = [[ "U55555EVE" -- Eve
-                                    , "U6666FAYE" -- Faye
-                                    ]
-                                   ,[ "U77777GIL" -- Gil
-                                    , "U88888HAL" -- Hal
-                                    ]
-                                   ]
-                    , others = [] : List Text
-                    }
-        , name = "dev"
-        , topic = \(caretakers : Text) -> "${caretakers} are the caretakers"
-        }
-      ]
+in    teams
+        [ { members =
+            { caretakers = [ [ "U111ALICE", "U22222BOB", "U333CAROL" ] ]
+            , others = [ "U4444DAVE" ]
+            }
+          , name = "design"
+          , topic =
+              \(caretaker : Text) ->
+                let standup = "Stand-up *9:30*"
+
+                let board = "Board :incoming_envelope: https://team.board/url"
+
+                let separator = ":paw_prints:"
+
+                in  "${standup} ${separator} ${board} ${separator} Caretaker ${caretaker}"
+          }
+        , { members =
+            { caretakers =
+              [ [ "U55555EVE", "U6666FAYE" ], [ "U77777GIL", "U88888HAL" ] ]
+            , others = [] : List Text
+            }
+          , name = "dev"
+          , topic = \(caretakers : Text) -> "${caretakers} are the caretakers"
+          }
+        ]
     : List Conf
 ```
 

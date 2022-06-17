@@ -116,7 +116,7 @@ ensure inputText = do
   teamResults <- traverse (wrapTeamResult $ ensureTeamState getDisplayName findChannel) records
   return $ unlines teamResults
   where
-    wrapTeamResult f record = ("Team " <> team record <> ": success!") <$ f record
+    wrapTeamResult f record = ("Team " <> Config.name record <> ": success!") <$ f record
 
 dryRunEnsure ::
   ( Member Config r,

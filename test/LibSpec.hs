@@ -58,12 +58,12 @@ spec = do
       dryRunEnsure "ignored"
         & runConfigConst
           [ Team
-              { members =
+              { name = "team",
+                members =
                   Members
                     { caretakers = [["user_id"]],
                       others = []
                     },
-                team = "team",
                 topic = const "topic"
               }
           ]
@@ -78,12 +78,12 @@ spec = do
       dryRunEnsure "ignored"
         & runConfigConst
           [ Team
-              { members =
+              { name = "team",
+                members =
                   Members
                     { caretakers = [["alice", "bob"]],
                       others = ["caroline"]
                     },
-                team = "team",
                 topic = const "topic"
               }
           ]
@@ -115,12 +115,12 @@ spec = do
       ensure "ignored"
         & runConfigConst
           [ Team
-              { members =
+              { name = "design",
+                members =
                   Members
                     { caretakers = [["alice", "bob"]],
                       others = ["caroline"]
                     },
-                team = "design",
                 topic = ("Caretaker is: " <>)
               }
           ]

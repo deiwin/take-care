@@ -2,7 +2,7 @@ module ReadmeSpec (spec) where
 
 import Config
   ( Group (..),
-    Team,
+    Conf,
     currentDesiredTeamState,
     currentGroups,
     runConfig,
@@ -61,7 +61,7 @@ spec = do
     result <- dryRunExample
     showDesiredTeamStateList mockGetDisplayName states `shouldBe` Just result
 
-parseTeamList :: Text -> IO [Team]
+parseTeamList :: Text -> IO [Conf]
 parseTeamList = runM . runConfig . Config.parse
 
 mockGetDisplayName :: Text -> Maybe Text

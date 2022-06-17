@@ -1,13 +1,14 @@
-{-# LANGUAGE DeriveAnyClass     #-}
-{-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE OverloadedStrings  #-}
-{-# LANGUAGE TemplateHaskell    #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Config
-  ( Members (..),
-    Team (..),
-    Group (..),
+  ( Group (..),
+    Conf (..),
+    Rotation (..),
+    Effect (..),
     DesiredTeamState (..),
     currentGroups,
     currentDesiredTeamState,
@@ -20,42 +21,25 @@ module Config
   )
 where
 
-import Effect (Effect (..))
-
+import Data.Function ((&))
+import Data.Maybe (mapMaybe)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Text (Text, intercalate, lines, pack, replicate)
 import Data.Time.Calendar.WeekDate (toWeekDate)
 import Data.Time.Clock (UTCTime (..))
 import Dhall (FromDhall)
-import Dhall.TH (makeHaskellTypes, HaskellType (..))
 import qualified Dhall (auto, input)
-import Effect
+import Dhall.TH (HaskellType (..), makeHaskellTypes)
+import Effect (Effect (..))
 import GHC.Generics (Generic)
 import Polysemy (Embed, InterpreterFor, Member, embed, interpret, makeSem)
 import Text.Printf (printf)
 import Prelude hiding (lines, replicate)
 
-data Members = Members
-  { caretakers :: [[Text]],
-    others :: [Text]
-  }
-  deriving (Generic, Show)
-
-instance FromDhall Members
-
-data Team = Team
-  { name :: Text,
-    members :: Members,
-    topic :: Text -> Text
-  }
-  deriving (Generic)
-
-instance FromDhall Team
-
 Dhall.TH.makeHaskellTypes
-    [ MultipleConstructors "Rotation" "./src/Rotation.dhall"
-    ]
+  [ MultipleConstructors "Rotation" "./src/Rotation.dhall"
+  ]
 
 data Conf = Conf
   { rotation :: Rotation,
@@ -88,8 +72,8 @@ runConfig :: Member (Embed IO) r => InterpreterFor Config r
 runConfig = interpret \case
   Parse input -> embed $ Dhall.input Dhall.auto input
 
-currentGroups :: UTCTime -> [Team] -> [Group]
-currentGroups time teams = concat (groupList . currentDesiredTeamState time <$> teams)
+currentGroups :: UTCTime -> [Conf] -> [Group]
+currentGroups time confList = concat (groupList . currentDesiredTeamState time <$> confList)
 
 showDesiredTeamStateList :: forall m. (Monad m) => (Text -> m Text) -> [DesiredTeamState] -> m Text
 showDesiredTeamStateList getDisplayName desiredTeamStateList =
@@ -125,35 +109,36 @@ padLeft spaces = fmapLines (prefix <>)
 interUnlines :: [Text] -> Text
 interUnlines = intercalate "\n"
 
-currentDesiredTeamState :: UTCTime -> Team -> DesiredTeamState
-currentDesiredTeamState time team =
+currentDesiredTeamState :: UTCTime -> Conf -> DesiredTeamState
+currentDesiredTeamState time conf =
   DesiredTeamState
-    { teamName = teamName,
-      teamChannelName = "tm-" <> teamName,
-      groupList = [caretakers, everyone],
-      topicGivenDisplayNames =
-        \getDisplayName -> do
-          displayNameList <- traverse getDisplayName $ Set.toList caretakerIDs
-          return $ topic team $ intercalate ", " displayNameList
+    { teamName = "mock-team-name",
+      teamChannelName = "tm-mock-team-channel-name",
+      groupList = groupList,
+      topicGivenDisplayNames = const (return "mock topic")
     }
   where
-    caretakers =
-      Group
-        { handle = teamName <> "-caretaker",
-          description = "Team " <> teamName <> " caretaker(s)",
-          memberIDs = caretakerIDs
-        }
-    caretakerIDs = Set.fromList $ currentCaretakerList time team
-    everyone =
-      Group
-        { handle = teamName <> "-team",
-          description = "Team " <> teamName,
-          memberIDs = Set.fromList $ others (members team) ++ concat (Config.caretakers $ members team)
-        }
-    teamName = Config.name team
+    groupList =
+      effects conf
+        & mapMaybe
+          ( \case
+              SetSlackGroup name ->
+                Just
+                  ( Group
+                      { handle = name,
+                        description = "mock-description",
+                        memberIDs = Set.fromList members
+                      }
+                  )
+              _ -> Nothing
+          )
+    members =
+      case rotation conf of
+        Weekly membersList -> currentCaretaker time <$> membersList
+        Const members -> members
 
-currentCaretakerList :: UTCTime -> Team -> [Text]
-currentCaretakerList time team = currentCaretaker time <$> caretakers (members team)
+-- currentCaretakerList :: UTCTime -> Team -> [Text]
+-- currentCaretakerList time team = currentCaretaker time <$> caretakers (members team)
 
 currentCaretaker :: UTCTime -> [Text] -> Text
 currentCaretaker time candidates = cycle candidates !! utcWeek

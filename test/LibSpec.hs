@@ -2,15 +2,16 @@
 
 module LibSpec (spec) where
 
-import Config (Config (..), Members (..), Team (..))
+import Config (Conf (..), Config (..), Effect (..), Rotation (..))
 import Control.Arrow (first, second)
 import Control.Category ((>>>))
 import Data.Function ((&))
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Text (Text)
+import Data.Text (Text, intercalate)
 import Data.Time.Clock (UTCTime)
 import Data.Time.Format.ISO8601 (iso8601ParseM)
+import Effect (SetSlackChannelTopicRecord (..))
 import IO (Time (..))
 import Lib (dryRunEnsure, ensure, listUsers)
 import NeatInterpolation (trimming)
@@ -57,14 +58,17 @@ spec = do
       time <- iso8601ParseM "2021-10-10T00:00:00Z"
       dryRunEnsure "ignored"
         & runConfigConst
-          [ Team
-              { name = "team",
-                members =
-                  Members
-                    { caretakers = [["user_id"]],
-                      others = []
-                    },
-                topic = const "topic"
+          [ Conf
+              { rotation = Weekly [["user_id"]],
+                effects =
+                  [ SetSlackGroup "team-caretaker",
+                    SetSlackChannelTopic
+                      ( SetSlackChannelTopicRecord
+                          { name = "tm-team",
+                            topic = const "topic"
+                          }
+                      )
+                  ]
               }
           ]
         & runTimeConst time
@@ -77,14 +81,24 @@ spec = do
       time <- iso8601ParseM "2021-10-10T00:00:00Z"
       dryRunEnsure "ignored"
         & runConfigConst
-          [ Team
-              { name = "team",
-                members =
-                  Members
-                    { caretakers = [["alice", "bob"]],
-                      others = ["caroline"]
-                    },
-                topic = const "topic"
+          [ Conf
+              { rotation = Weekly [["alice", "bob"]],
+                effects =
+                  [ SetSlackGroup "team-caretaker",
+                    SetSlackChannelTopic
+                      ( SetSlackChannelTopicRecord
+                          { name = "tm-team",
+                            topic = const "topic"
+                          }
+                      )
+                  ]
+              },
+            Conf
+              { rotation = Const ["alice", "bob", "caroline"],
+                effects =
+                  [ SetSlackGroup "team-team",
+                    InviteToSlackChannel "tm-team"
+                  ]
               }
           ]
         & runTimeConst time
@@ -114,14 +128,24 @@ spec = do
       time <- iso8601ParseM "2021-10-10T00:00:00Z"
       ensure "ignored"
         & runConfigConst
-          [ Team
-              { name = "design",
-                members =
-                  Members
-                    { caretakers = [["alice", "bob"]],
-                      others = ["caroline"]
-                    },
-                topic = ("Caretaker is: " <>)
+          [ Conf
+              { rotation = Weekly [["alice", "bob"]],
+                effects =
+                  [ SetSlackGroup "design-caretaker",
+                    SetSlackChannelTopic
+                      ( SetSlackChannelTopicRecord
+                          { name = "tm-design",
+                            topic = ("Caretaker is: " <>) . intercalate ", "
+                          }
+                      )
+                  ]
+              },
+            Conf
+              { rotation = Const ["alice", "bob", "caroline"],
+                effects =
+                  [ SetSlackGroup "design-team",
+                    InviteToSlackChannel "tm-design"
+                  ]
               }
           ]
         & runTimeConst time
@@ -229,7 +253,7 @@ runGroups initialState =
               return group
       Find handle -> fmap fst . Map.lookup ("id_" <> handle) <$> get
 
-runConfigConst :: [Team] -> InterpreterFor Config r
+runConfigConst :: [Conf] -> InterpreterFor Config r
 runConfigConst teams = interpret \case
   Parse _ -> return teams
 

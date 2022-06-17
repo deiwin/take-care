@@ -11,7 +11,7 @@ import Config
   ( Config,
     DesiredTeamState (..),
     Group (..),
-    Team (..),
+    Conf (..),
     currentDesiredTeamState,
     runConfig,
     showDesiredTeamStateList,
@@ -116,7 +116,7 @@ ensure inputText = do
   teamResults <- traverse (wrapTeamResult $ ensureTeamState getDisplayName findChannel) records
   return $ unlines teamResults
   where
-    wrapTeamResult f record = ("Team " <> Config.name record <> ": success!") <$ f record
+    wrapTeamResult f record = "Team MOCK: success!" <$ f record
 
 dryRunEnsure ::
   ( Member Config r,
@@ -146,7 +146,7 @@ ensureTeamState ::
   ) =>
   GetDisplayName ->
   FindChannel ->
-  Team ->
+  Conf ->
   Sem r ()
 ensureTeamState getDisplayName findChannel record = do
   time <- Time.getCurrent

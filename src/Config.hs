@@ -31,7 +31,7 @@ import Data.Time.Clock (UTCTime (..))
 import Dhall (FromDhall)
 import qualified Dhall (auto, input)
 import Dhall.TH (HaskellType (..), makeHaskellTypes)
-import Effect (Effect (..))
+import Effect (Effect (..), SetSlackChannelTopicRecord (..))
 import GHC.Generics (Generic)
 import Polysemy (Embed, InterpreterFor, Member, embed, interpret, makeSem)
 import Text.Printf (printf)
@@ -73,21 +73,32 @@ runConfig = interpret \case
   Parse input -> embed $ Dhall.input Dhall.auto input
 
 currentGroups :: UTCTime -> [Conf] -> [Group]
-currentGroups time confList = concat (groupList . currentDesiredTeamState time <$> confList)
+-- currentGroups time confList = concat (groupList . currentDesiredTeamState time <$> confList)
+currentGroups time confList = undefined
 
-showDesiredTeamStateList :: forall m. (Monad m) => (Text -> m Text) -> [DesiredTeamState] -> m Text
+showDesiredTeamStateList :: forall m. (Monad m) => (Text -> m Text) -> [([Text], [Effect])] -> m Text
 showDesiredTeamStateList getDisplayName desiredTeamStateList =
   intercalate "\n\n" <$> traverse (showDesiredTeamState getDisplayName) desiredTeamStateList
 
-showDesiredTeamState :: forall m. (Monad m) => (Text -> m Text) -> DesiredTeamState -> m Text
-showDesiredTeamState getDisplayName desiredTeamState = interUnlines <$> sequence lines
+showDesiredTeamState :: forall m. (Monad m) => (Text -> m Text) -> ([Text], [Effect]) -> m Text
+showDesiredTeamState getDisplayName (members, effects) = interUnlines <$> sequence lines
   where
-    lines = titleLine : (padLeft 2 <<$>> otherLines)
-    titleLine = return $ pack $ printf "Team %s:" $ teamName desiredTeamState
-    otherLines = topicLine : groupLines
-    topicLine = pack . printf "#%s topic: %s" (teamChannelName desiredTeamState) <$> topic
-    topic = topicGivenDisplayNames desiredTeamState getDisplayName
-    groupLines = showGroup getDisplayName <$> groupList desiredTeamState
+    lines :: [m Text]
+    lines = memberLine : effectLines
+    memberLine = members
+        & traverse getDisplayName -- m [Text]
+        & fmap (pack . printf "For %s:" . intercalate ", ")
+    effectLines = effects
+        & (fmap \case
+            SetSlackChannelTopic record ->
+                members
+                  & traverse getDisplayName -- m [Text]
+                  & fmap (topic record) -- m Text
+                  & fmap (pack . printf "SetSlackChannelTopic #%s: %s" (name record))
+            InviteToSlackChannel name -> return $ pack $ printf "InviteToSlackChannel: #%s" name
+            SetSlackGroup name -> return $ pack $ printf "SetSlackGroup: @%s" name
+          )
+        & fmap (fmap (padLeft 2))
 
 showGroup :: forall m. (Monad m) => (Text -> m Text) -> Group -> m Text
 showGroup getDisplayName group = interUnlines <$> sequence lines
@@ -109,33 +120,34 @@ padLeft spaces = fmapLines (prefix <>)
 interUnlines :: [Text] -> Text
 interUnlines = intercalate "\n"
 
-currentDesiredTeamState :: UTCTime -> Conf -> DesiredTeamState
+currentDesiredTeamState :: UTCTime -> Conf -> ([Text], [Effect])
 currentDesiredTeamState time conf =
-  DesiredTeamState
-    { teamName = "mock-team-name",
-      teamChannelName = "tm-mock-team-channel-name",
-      groupList = groupList,
-      topicGivenDisplayNames = const (return "mock topic")
-    }
+  (
+    resolve $ rotation conf,
+    effects conf
+  )
   where
-    groupList =
-      effects conf
-        & mapMaybe
-          ( \case
-              SetSlackGroup name ->
-                Just
-                  ( Group
-                      { handle = name,
-                        description = "mock-description",
-                        memberIDs = Set.fromList members
-                      }
-                  )
-              _ -> Nothing
-          )
-    members =
-      case rotation conf of
+    resolve = \case
         Weekly membersList -> currentCaretaker time <$> membersList
         Const members -> members
+    -- groupList =
+    --   effects conf
+    --     & mapMaybe
+    --       ( \case
+    --           SetSlackGroup name ->
+    --             Just
+    --               ( Group
+    --                   { handle = name,
+    --                     description = "mock-description",
+    --                     memberIDs = Set.fromList members
+    --                   }
+    --               )
+    --           _ -> Nothing
+    --       )
+    -- members =
+    --   case rotation conf of
+    --     Weekly membersList -> currentCaretaker time <$> membersList
+    --     Const members -> members
 
 -- currentCaretakerList :: UTCTime -> Team -> [Text]
 -- currentCaretakerList time team = currentCaretaker time <$> caretakers (members team)

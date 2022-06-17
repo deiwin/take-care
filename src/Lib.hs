@@ -151,10 +151,11 @@ ensureTeamState ::
 ensureTeamState getDisplayName findChannel record = do
   time <- Time.getCurrent
   let desiredTeamState = currentDesiredTeamState time record
-  channel <- findOrCreateChannel findChannel $ teamChannelName desiredTeamState
-  ensureChannelTopic getDisplayName channel desiredTeamState
-  let channelID = channel ^. Channel.id
-  traverse_ (ensureGroupState [channelID]) $ groupList desiredTeamState
+  -- channel <- findOrCreateChannel findChannel $ teamChannelName desiredTeamState
+  -- ensureChannelTopic getDisplayName channel desiredTeamState
+  -- let channelID = channel ^. Channel.id
+  -- traverse_ (ensureGroupState [channelID]) $ groupList desiredTeamState
+  return ()
 
 ensureChannelTopic ::
   ( Member (Error Text) r,

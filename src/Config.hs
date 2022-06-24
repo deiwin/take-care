@@ -22,9 +22,8 @@ module Config
 where
 
 import Data.Function ((&))
-import Data.Maybe (mapMaybe)
+import Data.Functor ((<&>))
 import Data.Set (Set)
-import qualified Data.Set as Set
 import Data.Text (Text, intercalate, lines, pack, replicate)
 import Data.Time.Calendar.WeekDate (toWeekDate)
 import Data.Time.Clock (UTCTime (..))
@@ -83,33 +82,22 @@ showDesiredTeamStateList getDisplayName desiredTeamStateList =
 showDesiredTeamState :: forall m. (Monad m) => (Text -> m Text) -> ([Text], [Effect]) -> m Text
 showDesiredTeamState getDisplayName (members, effects) = interUnlines <$> sequence lines
   where
-    lines :: [m Text]
     lines = memberLine : effectLines
-    memberLine = members
-        & traverse getDisplayName -- m [Text]
-        & fmap (pack . printf "For %s:" . intercalate ", ")
-    effectLines = effects
-        & (fmap \case
-            SetSlackChannelTopic record ->
-                members
-                  & traverse getDisplayName -- m [Text]
-                  & fmap (topic record) -- m Text
-                  & fmap (pack . printf "SetSlackChannelTopic #%s: %s" (name record))
-            InviteToSlackChannel name -> return $ pack $ printf "InviteToSlackChannel: #%s" name
-            SetSlackGroup name -> return $ pack $ printf "SetSlackGroup: @%s" name
-          )
-        & fmap (fmap (padLeft 2))
-
-showGroup :: forall m. (Monad m) => (Text -> m Text) -> Group -> m Text
-showGroup getDisplayName group = interUnlines <$> sequence lines
-  where
-    lines = titleLine : (padLeft 2 <<$>> otherLines)
-    titleLine = return $ pack $ printf "@%s group:" (handle group)
-    otherLines = [descriptionLine, memberLine]
-    descriptionLine = return $ "Description: " <> description group
-    memberLine = ("Members: " <>) <$> memberNameListText
-    memberNameListText = intercalate ", " <$> memberNameList
-    memberNameList = traverse getDisplayName (Set.toList $ memberIDs group)
+    memberLine =
+      members
+        & traverse getDisplayName
+        <&> intercalate ", "
+        <&> printf "For %s:"
+        <&> pack
+    effectLines = padLeft 2 . pack <<$>> showEffect <$> effects
+    showEffect = \case
+      SetSlackChannelTopic record ->
+        members
+          & traverse getDisplayName
+          <&> topic record
+          <&> printf "SetSlackChannelTopic #%s: %s" (name record)
+      InviteToSlackChannel name -> return $ printf "InviteToSlackChannel: #%s" name
+      SetSlackGroup name -> return $ printf "SetSlackGroup: @%s" name
 
 padLeft :: Int -> Text -> Text
 padLeft spaces = fmapLines (prefix <>)
@@ -122,35 +110,13 @@ interUnlines = intercalate "\n"
 
 currentDesiredTeamState :: UTCTime -> Conf -> ([Text], [Effect])
 currentDesiredTeamState time conf =
-  (
-    resolve $ rotation conf,
+  ( resolveRotation $ rotation conf,
     effects conf
   )
   where
-    resolve = \case
-        Weekly membersList -> currentCaretaker time <$> membersList
-        Const members -> members
-    -- groupList =
-    --   effects conf
-    --     & mapMaybe
-    --       ( \case
-    --           SetSlackGroup name ->
-    --             Just
-    --               ( Group
-    --                   { handle = name,
-    --                     description = "mock-description",
-    --                     memberIDs = Set.fromList members
-    --                   }
-    --               )
-    --           _ -> Nothing
-    --       )
-    -- members =
-    --   case rotation conf of
-    --     Weekly membersList -> currentCaretaker time <$> membersList
-    --     Const members -> members
-
--- currentCaretakerList :: UTCTime -> Team -> [Text]
--- currentCaretakerList time team = currentCaretaker time <$> caretakers (members team)
+    resolveRotation = \case
+      Weekly membersList -> currentCaretaker time <$> membersList
+      Const members -> members
 
 currentCaretaker :: UTCTime -> [Text] -> Text
 currentCaretaker time candidates = cycle candidates !! utcWeek

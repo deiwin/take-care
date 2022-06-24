@@ -112,14 +112,13 @@ spec = do
         & ( `shouldBe`
               Right
                 [trimming|
-                  Team team:
-                    #tm-team topic: topic
-                    @team-caretaker group:
-                      Description: Team team caretaker(s)
-                      Members: Alice
-                    @team-team group:
-                      Description: Team team
-                      Members: Alice, Bob, Caroline
+                  For Alice:
+                    SetSlackGroup: @team-caretaker
+                    SetSlackChannelTopic #tm-team: topic
+
+                  For Alice, Bob, Caroline:
+                    SetSlackGroup: @team-team
+                    InviteToSlackChannel: #tm-team
                 |]
           )
 

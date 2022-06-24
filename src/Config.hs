@@ -26,6 +26,8 @@ import Data.Time.Calendar.WeekDate (toWeekDate)
 import Data.Time.Clock (UTCTime (..))
 import Dhall (FromDhall)
 import qualified Dhall (auto, input)
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Dhall.TH (HaskellType (..), makeHaskellTypes)
 import Effect (Effect (..))
 import GHC.Generics (Generic)
@@ -50,7 +52,7 @@ data Config m a where
 
 makeSem ''Config
 
-type ResolvedRotationEffects = ([Text], [Effect])
+type ResolvedRotationEffects = (Set Text, [Effect])
 
 runConfig :: Member (Embed IO) r => InterpreterFor Config r
 runConfig = interpret \case
@@ -68,6 +70,7 @@ showResolvedRotationEffects getDisplayName (members, effects) = interUnlines <$>
     lines = memberLine : effectLines
     memberLine =
       members
+        & Set.toList
         & traverse getDisplayName
         <&> intercalate ", "
         <&> printf "For %s:"
@@ -76,6 +79,7 @@ showResolvedRotationEffects getDisplayName (members, effects) = interUnlines <$>
     showEffect = \case
       record@SetSlackChannelTopic{} ->
         members
+          & Set.toList
           & traverse getDisplayName
           <&> topic record
           <&> printf "SetSlackChannelTopic #%s: %s" (name record)
@@ -93,7 +97,7 @@ interUnlines = intercalate "\n"
 
 currentResolvedRotationEffects :: UTCTime -> Conf -> ResolvedRotationEffects
 currentResolvedRotationEffects time conf =
-  ( resolveRotation $ rotation conf,
+  ( Set.fromList $ resolveRotation $ rotation conf,
     effects conf
   )
   where

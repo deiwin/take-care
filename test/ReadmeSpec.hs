@@ -9,6 +9,7 @@ import Config
   )
 import qualified Config (parse)
 import Data.Function ((&))
+import qualified Data.Set as Set
 import Data.Text (Text, intercalate, lines, unlines)
 import Data.Text.IO (readFile)
 import Data.Time.Format.ISO8601 (iso8601ParseM)
@@ -29,7 +30,7 @@ spec = do
 
     let resolvedRotationEffectsList = currentResolvedRotationEffects time <$> confList
     resolvedRotationEffectsList
-      `shouldMatchList` [ ( ["U22222BOB"],
+      `shouldMatchList` [ ( Set.fromList ["U22222BOB"],
                             [ SetSlackChannelTopic
                                 { name = "tm-design",
                                   topic = \members ->
@@ -41,12 +42,12 @@ spec = do
                               SetSlackGroup "design-caretaker"
                             ]
                           ),
-                          ( ["U111ALICE", "U22222BOB", "U333CAROL", "U4444DAVE"],
+                          ( Set.fromList ["U111ALICE", "U22222BOB", "U333CAROL", "U4444DAVE"],
                             [ InviteToSlackChannel "tm-design",
                               SetSlackGroup "design-team"
                             ]
                           ),
-                          ( ["U55555EVE", "U77777GIL"],
+                          ( Set.fromList ["U55555EVE", "U77777GIL"],
                             [ SetSlackChannelTopic
                                 { name = "tm-dev",
                                   topic = \members -> intercalate ", " members <> " are the caretakers"
@@ -54,7 +55,7 @@ spec = do
                               SetSlackGroup "dev-caretaker"
                             ]
                           ),
-                          ( ["U55555EVE", "U6666FAYE", "U77777GIL", "U88888HAL"],
+                          ( Set.fromList ["U55555EVE", "U6666FAYE", "U77777GIL", "U88888HAL"],
                             [ InviteToSlackChannel "tm-dev",
                               SetSlackGroup "dev-team"
                             ]

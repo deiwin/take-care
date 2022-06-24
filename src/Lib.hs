@@ -25,6 +25,7 @@ import Data.Foldable (traverse_)
 import Data.Function ((&))
 import Data.List ((\\))
 import qualified Data.Map.Strict as Map
+import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Text (Text, filter, pack, unlines)
 import IO (Env, Time, runEnv, runTime)
@@ -163,7 +164,7 @@ applyEffect ::
   GetDisplayName ->
   FindChannel ->
   UTCTime ->
-  [Text] ->
+  Set Text ->
   Effect ->
   Sem r ()
 applyEffect getDisplayName findChannel time members = \case

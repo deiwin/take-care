@@ -157,6 +157,7 @@ spec = do
                         ( Group
                             { _id = "id_design-caretaker",
                               _handle = "design-caretaker",
+                              _name = "Team design caretaker(s)",
                               _channelIDs = ["id_tm-design"]
                             },
                           ["alice"]
@@ -166,6 +167,7 @@ spec = do
                         ( Group
                             { _id = "id_design-team",
                               _handle = "design-team",
+                              _name = "Team design",
                               _channelIDs = ["id_tm-design"]
                             },
                           ["alice", "bob", "caroline"]
@@ -236,9 +238,9 @@ runGroups initialState =
               if Map.member groupID store
                 then put $ Map.adjust (first updateChannels) groupID store
                 else throw ("Group " <> groupID <> " does not exist")
-      G.Create handle _name defaultChannelIDs ->
+      G.Create handle name defaultChannelIDs ->
         let groupID = "id_" <> handle
-            group = Group {_id = groupID, _handle = handle, _channelIDs = defaultChannelIDs}
+            group = Group {_id = groupID, _handle = handle, _name = name, _channelIDs = defaultChannelIDs}
             members = []
          in do
               modify $ Map.insert groupID (group, members)

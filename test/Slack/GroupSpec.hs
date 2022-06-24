@@ -67,7 +67,7 @@ spec = do
         & runGetConst "{\"usergroups\": [{\"id\": \"something\"}]}"
         & (`shouldBe` Left "key \"handle\" not found")
 
-    it "fails if group object does not have a 'prefs' key" $ do
+    it "fails if group object does not have a name key" $ do
       Groups.find "whatever"
         & runGetConst
           [trimming|
@@ -75,6 +75,20 @@ spec = do
             "usergroups": [{
               "id": "group_id",
               "handle": "group_handle"
+            }]
+          }
+          |]
+        & (`shouldBe` Left "key \"name\" not found")
+
+    it "fails if group object does not have a 'prefs' key" $ do
+      Groups.find "whatever"
+        & runGetConst
+          [trimming|
+          {
+            "usergroups": [{
+              "id": "group_id",
+              "handle": "group_handle",
+              "name": "group_name"
             }]
           }
           |]
@@ -88,6 +102,7 @@ spec = do
             "usergroups": [{
               "id": "group_id",
               "handle": "group_handle",
+              "name": "group_name",
               "prefs": "prefs"
             }]
           }
@@ -102,6 +117,7 @@ spec = do
             "usergroups": [{
               "id": "group_id",
               "handle": "group_handle",
+              "name": "group_name",
               "prefs": {}
             }]
           }
@@ -116,6 +132,7 @@ spec = do
             "usergroups": [{
               "id": "group_id",
               "handle": "group_handle",
+              "name": "group_name",
               "prefs": {
                 "channels": ["channel_id1", "channel_id2"]
               }
@@ -132,6 +149,7 @@ spec = do
             "usergroups": [{
               "id": "group_id",
               "handle": "group_handle",
+              "name": "group_name",
               "prefs": {
                 "channels": ["channel_id1", "channel_id2"]
               }
@@ -144,6 +162,7 @@ spec = do
                     ( Group
                         { _id = "group_id",
                           _handle = "group_handle",
+                          _name = "group_name",
                           _channelIDs = ["channel_id1", "channel_id2"]
                         }
                     )
@@ -267,6 +286,7 @@ spec = do
             "usergroup": {
               "id": "group_id",
               "handle": "group_handle",
+              "name": "group_name",
               "prefs": {
                 "channels": ["channel1", "channel2"]
               }
@@ -278,6 +298,7 @@ spec = do
                 ( Group
                     { _id = "group_id",
                       _handle = "group_handle",
+                      _name = "group_name",
                       _channelIDs = ["channel1", "channel2"]
                     }
                 )

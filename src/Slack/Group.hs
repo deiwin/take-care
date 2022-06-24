@@ -2,6 +2,7 @@ module Slack.Group
   ( Group (..),
     id,
     handle,
+    name,
     channelIDs,
     Groups (..),
     runGroups,
@@ -31,6 +32,7 @@ import Prelude hiding (id)
 data Group = Group
   { _id :: Text,
     _handle :: Text,
+    _name :: Text,
     _channelIDs :: [Text]
   }
   deriving (Generic, Show, Eq)
@@ -41,6 +43,7 @@ instance FromJSON Group where
   parseJSON = withObject "Group" $ \o -> do
     _id <- o .: "id"
     _handle <- o .: "handle"
+    _name <- o .: "name"
     prefs <- o .: "prefs"
     _channelIDs <- prefs .: "channels"
     return Group {..}

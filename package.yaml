@@ -54,6 +54,8 @@ default-extensions:
 - TypeApplications
 - TypeFamilies
 - TypeOperators
+- DuplicateRecordFields
+- NamedFieldPuns
 
 library:
   source-dirs: src

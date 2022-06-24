@@ -60,7 +60,10 @@ spec = do
           [ Conf
               { rotation = Weekly [["user_id"]],
                 effects =
-                  [ SetSlackGroup "team-caretaker",
+                  [ SetSlackGroup
+                      { handle = "team-caretaker",
+                        name = "Team team caretaker(s)"
+                      },
                     SetSlackChannelTopic
                       { name = "tm-team",
                         topic = const "topic"
@@ -81,7 +84,10 @@ spec = do
           [ Conf
               { rotation = Weekly [["alice", "bob"]],
                 effects =
-                  [ SetSlackGroup "team-caretaker",
+                  [ SetSlackGroup
+                      { handle = "team-caretaker",
+                        name = "Team team caretaker(s)"
+                      },
                     SetSlackChannelTopic
                       { name = "tm-team",
                         topic = const "topic"
@@ -91,7 +97,10 @@ spec = do
             Conf
               { rotation = Const ["alice", "bob", "caroline"],
                 effects =
-                  [ SetSlackGroup "team-team",
+                  [ SetSlackGroup
+                      { handle = "team-team",
+                        name = "Team team"
+                      },
                     InviteToSlackChannel "tm-team"
                   ]
               }
@@ -108,11 +117,11 @@ spec = do
               Right
                 [trimming|
                   For Alice:
-                    SetSlackGroup: @team-caretaker
+                    SetSlackGroup: @team-caretaker (Team team caretaker(s))
                     SetSlackChannelTopic #tm-team: topic
 
                   For Alice, Bob, Caroline:
-                    SetSlackGroup: @team-team
+                    SetSlackGroup: @team-team (Team team)
                     InviteToSlackChannel: #tm-team
                 |]
           )
@@ -125,7 +134,10 @@ spec = do
           [ Conf
               { rotation = Weekly [["alice", "bob"]],
                 effects =
-                  [ SetSlackGroup "design-caretaker",
+                  [ SetSlackGroup
+                      { handle = "design-caretaker",
+                        name = "Team design caretaker(s)"
+                      },
                     SetSlackChannelTopic
                       { name = "tm-design",
                         topic = ("Caretaker is: " <>) . intercalate ", "
@@ -135,7 +147,10 @@ spec = do
             Conf
               { rotation = Const ["alice", "bob", "caroline"],
                 effects =
-                  [ SetSlackGroup "design-team",
+                  [ SetSlackGroup
+                      { handle = "design-team",
+                        name = "Team design"
+                      },
                     InviteToSlackChannel "tm-design"
                   ]
               }

@@ -50,7 +50,11 @@ spec = do
           let Effect = ./src/Effect.dhall
           let Rotation = ./src/Rotation.dhall
            in [ { rotation = Rotation.Const ["user-id"]
-                , effects = [ Effect.SetSlackGroup "group-name" ]
+                , effects = [ Effect.SetSlackGroup
+                                { handle = "group-handle"
+                                , name = "group-name"
+                                }
+                            ]
                 }
               ]
         |]
@@ -59,7 +63,11 @@ spec = do
     let resolvedRotationEffectsList = currentResolvedRotationEffects time <$> confList
     resolvedRotationEffectsList
       `shouldMatchList` [ ( Set.fromList ["user-id"],
-                            [SetSlackGroup "group-name"]
+                            [ SetSlackGroup
+                                { handle = "group-handle",
+                                  name = "group-name"
+                                }
+                            ]
                           )
                         ]
 
@@ -70,7 +78,11 @@ spec = do
           let Effect = ./src/Effect.dhall
           let Rotation = ./src/Rotation.dhall
            in [ { rotation = Rotation.Weekly [["user-id-one", "user-id-two"]]
-                , effects = [ Effect.SetSlackGroup "group-name" ]
+                , effects = [ Effect.SetSlackGroup
+                                { handle = "group-handle"
+                                , name = "group-name"
+                                }
+                            ]
                 }
               ]
         |]
@@ -79,7 +91,11 @@ spec = do
     let resolvedRotationEffectsList = currentResolvedRotationEffects time <$> confList
     resolvedRotationEffectsList
       `shouldMatchList` [ ( Set.fromList ["user-id-one"],
-                            [SetSlackGroup "group-name"]
+                            [ SetSlackGroup
+                                { handle = "group-handle",
+                                  name = "group-name"
+                                }
+                            ]
                           )
                         ]
 

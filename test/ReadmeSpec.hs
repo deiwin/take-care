@@ -39,12 +39,18 @@ spec = do
                                       <> " :paw_prints: Caretaker "
                                       <> intercalate ", " members
                                 },
-                              SetSlackGroup "design-caretaker"
+                              SetSlackGroup
+                                { handle = "design-caretaker",
+                                  name = "Team design caretaker(s)"
+                                }
                             ]
                           ),
                           ( Set.fromList ["U111ALICE", "U22222BOB", "U333CAROL", "U4444DAVE"],
                             [ InviteToSlackChannel "tm-design",
-                              SetSlackGroup "design-team"
+                              SetSlackGroup
+                                { handle = "design-team",
+                                  name = "Team design"
+                                }
                             ]
                           ),
                           ( Set.fromList ["U55555EVE", "U77777GIL"],
@@ -52,12 +58,18 @@ spec = do
                                 { name = "tm-dev",
                                   topic = \members -> intercalate ", " members <> " are the caretakers"
                                 },
-                              SetSlackGroup "dev-caretaker"
+                              SetSlackGroup
+                                { handle = "dev-caretaker",
+                                  name = "Team dev caretaker(s)"
+                                }
                             ]
                           ),
                           ( Set.fromList ["U55555EVE", "U6666FAYE", "U77777GIL", "U88888HAL"],
                             [ InviteToSlackChannel "tm-dev",
-                              SetSlackGroup "dev-team"
+                              SetSlackGroup
+                                { handle = "dev-team",
+                                  name = "Team dev"
+                                }
                             ]
                           )
                         ]

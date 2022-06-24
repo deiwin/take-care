@@ -166,7 +166,7 @@ applyEffect ::
   Effect ->
   Sem r ()
 applyEffect getDisplayName findChannel time members = \case
-  SetSlackGroup handle -> do
+  SetSlackGroup{handle, name} -> do
     existingGroup <- Groups.find handle
     slackGroup <- maybe createNew return existingGroup
     let groupID = slackGroup ^. Group.id
@@ -178,7 +178,7 @@ applyEffect getDisplayName findChannel time members = \case
     unless (same defaultChannelIDs currentChannels) $ Groups.setChannels groupID defaultChannelIDs
     where
       defaultChannelIDs = []
-      createNew = Groups.create handle "mock-description" defaultChannelIDs
+      createNew = Groups.create handle name defaultChannelIDs
       same a b = null (a \\ b) && null (b \\ a)
   _ -> return ()
 

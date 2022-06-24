@@ -27,7 +27,10 @@ data Effect
         topic :: [Text] -> Text
       }
   | InviteToSlackChannel Text
-  | SetSlackGroup Text
+  | SetSlackGroup
+      { handle :: Text,
+        name :: Text
+      }
   deriving (Generic, Show, Eq)
 
 instance FromDhall Effect

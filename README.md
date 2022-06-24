@@ -101,13 +101,19 @@ let team =
                           \(caretakers : List Text) ->
                             args.topic (concatSep ", " caretakers)
                       }
-                  , Effect.SetSlackGroup "${args.name}-caretaker"
+                  , Effect.SetSlackGroup
+                      { handle = "${args.name}-caretaker"
+                      , name = "Team ${args.name} caretaker(s)"
+                      }
                   ]
                 }
               , { rotation = Rotation.Const allMembers
                 , effects =
                   [ Effect.InviteToSlackChannel channelName
-                  , Effect.SetSlackGroup "${args.name}-team"
+                  , Effect.SetSlackGroup
+                      { handle = "${args.name}-team"
+                      , name = "Team ${args.name}"
+                      }
                   ]
                 }
               ]
@@ -150,19 +156,19 @@ command.
 $ docker run --rm -i -e "API_TOKEN=$API_TOKEN" deiwin/take-care:latest ensure --dry-run < teams.dhall
 For @U22222BOB:
   SetSlackChannelTopic #tm-design: Stand-up *9:30* :paw_prints: Board :incoming_envelope: https://team.board/url :paw_prints: Caretaker @U22222BOB
-  SetSlackGroup: @design-caretaker
+  SetSlackGroup: @design-caretaker (Team design caretaker(s))
 
 For @U111ALICE, @U22222BOB, @U333CAROL, @U4444DAVE:
   InviteToSlackChannel: #tm-design
-  SetSlackGroup: @design-team
+  SetSlackGroup: @design-team (Team design)
 
 For @U55555EVE, @U77777GIL:
   SetSlackChannelTopic #tm-dev: @U55555EVE, @U77777GIL are the caretakers
-  SetSlackGroup: @dev-caretaker
+  SetSlackGroup: @dev-caretaker (Team dev caretaker(s))
 
 For @U55555EVE, @U6666FAYE, @U77777GIL, @U88888HAL:
   InviteToSlackChannel: #tm-dev
-  SetSlackGroup: @dev-team
+  SetSlackGroup: @dev-team (Team dev)
 ```
 
 And finally, run the `ensure` command.

@@ -1,16 +1,14 @@
 module ReadmeSpec (spec) where
 
 import Config
-  ( Group (..),
-    Conf,
-    currentDesiredTeamState,
-    currentGroups,
+  ( Conf,
+    Effect (..),
+    currentResolvedRotationEffects,
     runConfig,
-    showDesiredTeamStateList,
+    showResolvedRotationEffectsList,
   )
 import qualified Config (parse)
 import Data.Function ((&))
-import qualified Data.Set as Set
 import Data.Text (Text, intercalate, lines, unlines)
 import Data.Text.IO (readFile)
 import Data.Time.Format.ISO8601 (iso8601ParseM)
@@ -26,43 +24,53 @@ import Prelude hiding (lines, readFile, unlines)
 spec :: Spec
 spec = do
   it "verifies README example" $ do
-    teams <- readmeText >>= parseTeamList
+    confList <- readmeText >>= parseConfList
     time <- iso8601ParseM "2021-10-10T00:00:00Z"
 
-    let groups = currentGroups time teams
-    groups
-      `shouldMatchList` [ Group
-                            { handle = "design-caretaker",
-                              description = "Team design caretaker(s)",
-                              memberIDs = Set.singleton "U22222BOB"
-                            },
-                          Group
-                            { handle = "design-team",
-                              description = "Team design",
-                              memberIDs = Set.fromList ["U111ALICE", "U22222BOB", "U333CAROL", "U4444DAVE"]
-                            },
-                          Group
-                            { handle = "dev-caretaker",
-                              description = "Team dev caretaker(s)",
-                              memberIDs = Set.fromList ["U55555EVE", "U77777GIL"]
-                            },
-                          Group
-                            { handle = "dev-team",
-                              description = "Team dev",
-                              memberIDs = Set.fromList ["U55555EVE", "U6666FAYE", "U77777GIL", "U88888HAL"]
-                            }
+    let resolvedRotationEffectsList = currentResolvedRotationEffects time <$> confList
+    resolvedRotationEffectsList
+      `shouldMatchList` [ ( ["U22222BOB"],
+                            [ SetSlackChannelTopic
+                                { name = "tm-design",
+                                  topic = \members ->
+                                    "Stand-up *9:30*"
+                                      <> " :paw_prints: Board :incoming_envelope: https://team.board/url"
+                                      <> " :paw_prints: Caretaker "
+                                      <> intercalate ", " members
+                                },
+                              SetSlackGroup "design-caretaker"
+                            ]
+                          ),
+                          ( ["U111ALICE", "U22222BOB", "U333CAROL", "U4444DAVE"],
+                            [ InviteToSlackChannel "tm-design",
+                              SetSlackGroup "design-team"
+                            ]
+                          ),
+                          ( ["U55555EVE", "U77777GIL"],
+                            [ SetSlackChannelTopic
+                                { name = "tm-dev",
+                                  topic = \members -> intercalate ", " members <> " are the caretakers"
+                                },
+                              SetSlackGroup "dev-caretaker"
+                            ]
+                          ),
+                          ( ["U55555EVE", "U6666FAYE", "U77777GIL", "U88888HAL"],
+                            [ InviteToSlackChannel "tm-dev",
+                              SetSlackGroup "dev-team"
+                            ]
+                          )
                         ]
 
-  it "shows formatted desired team states" $ do
-    teams <- readmeText >>= parseTeamList
+  it "shows formatted desired effects" $ do
+    confList <- readmeText >>= parseConfList
     time <- iso8601ParseM "2021-10-10T00:00:00Z"
-    let states = currentDesiredTeamState time <$> teams
+    let resolvedRotationEffectsList = currentResolvedRotationEffects time <$> confList
 
     result <- dryRunExample
-    showDesiredTeamStateList mockGetDisplayName states `shouldBe` Just result
+    showResolvedRotationEffectsList mockGetDisplayName resolvedRotationEffectsList `shouldBe` Just result
 
-parseTeamList :: Text -> IO [Conf]
-parseTeamList = runM . runConfig . Config.parse
+parseConfList :: Text -> IO [Conf]
+parseConfList = runM . runConfig . Config.parse
 
 mockGetDisplayName :: Text -> Maybe Text
 mockGetDisplayName = Just . ("@" <>)

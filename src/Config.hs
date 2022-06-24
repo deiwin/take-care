@@ -5,14 +5,12 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Config
-  ( Group (..),
-    Conf (..),
+  ( Conf (..),
     Rotation (..),
     Effect (..),
-    DesiredTeamState (..),
-    currentGroups,
-    currentDesiredTeamState,
-    showDesiredTeamStateList,
+    ResolvedRotationEffects,
+    currentResolvedRotationEffects,
+    showResolvedRotationEffectsList,
 
     -- * Effect
     Config (..),
@@ -23,14 +21,13 @@ where
 
 import Data.Function ((&))
 import Data.Functor ((<&>))
-import Data.Set (Set)
 import Data.Text (Text, intercalate, lines, pack, replicate)
 import Data.Time.Calendar.WeekDate (toWeekDate)
 import Data.Time.Clock (UTCTime (..))
 import Dhall (FromDhall)
 import qualified Dhall (auto, input)
 import Dhall.TH (HaskellType (..), makeHaskellTypes)
-import Effect (Effect (..), SetSlackChannelTopicRecord (..))
+import Effect (Effect (..))
 import GHC.Generics (Generic)
 import Polysemy (Embed, InterpreterFor, Member, embed, interpret, makeSem)
 import Text.Printf (printf)
@@ -48,39 +45,25 @@ data Conf = Conf
 
 instance FromDhall Conf
 
-data Group = Group
-  { handle :: Text,
-    description :: Text,
-    memberIDs :: Set Text
-  }
-  deriving (Show, Eq)
-
-data DesiredTeamState = DesiredTeamState
-  { teamName :: Text,
-    teamChannelName :: Text,
-    groupList :: [Group],
-    topicGivenDisplayNames :: forall m. (Monad m) => (Text -> m Text) -> m Text
-  }
-
 data Config m a where
   Parse :: Text -> Config m [Conf]
 
 makeSem ''Config
 
+type ResolvedRotationEffects = ([Text], [Effect])
+
 runConfig :: Member (Embed IO) r => InterpreterFor Config r
 runConfig = interpret \case
   Parse input -> embed $ Dhall.input Dhall.auto input
 
-currentGroups :: UTCTime -> [Conf] -> [Group]
--- currentGroups time confList = concat (groupList . currentDesiredTeamState time <$> confList)
-currentGroups time confList = undefined
+showResolvedRotationEffectsList :: forall m. (Monad m) => (Text -> m Text) -> [ResolvedRotationEffects] -> m Text
+showResolvedRotationEffectsList getDisplayName resolvedRotationEffectsList =
+  resolvedRotationEffectsList
+    & traverse (showResolvedRotationEffects getDisplayName)
+    <&> intercalate "\n\n"
 
-showDesiredTeamStateList :: forall m. (Monad m) => (Text -> m Text) -> [([Text], [Effect])] -> m Text
-showDesiredTeamStateList getDisplayName desiredTeamStateList =
-  intercalate "\n\n" <$> traverse (showDesiredTeamState getDisplayName) desiredTeamStateList
-
-showDesiredTeamState :: forall m. (Monad m) => (Text -> m Text) -> ([Text], [Effect]) -> m Text
-showDesiredTeamState getDisplayName (members, effects) = interUnlines <$> sequence lines
+showResolvedRotationEffects :: forall m. (Monad m) => (Text -> m Text) -> ResolvedRotationEffects -> m Text
+showResolvedRotationEffects getDisplayName (members, effects) = interUnlines <$> sequence lines
   where
     lines = memberLine : effectLines
     memberLine =
@@ -91,7 +74,7 @@ showDesiredTeamState getDisplayName (members, effects) = interUnlines <$> sequen
         <&> pack
     effectLines = padLeft 2 . pack <<$>> showEffect <$> effects
     showEffect = \case
-      SetSlackChannelTopic record ->
+      record@SetSlackChannelTopic{} ->
         members
           & traverse getDisplayName
           <&> topic record
@@ -108,8 +91,8 @@ padLeft spaces = fmapLines (prefix <>)
 interUnlines :: [Text] -> Text
 interUnlines = intercalate "\n"
 
-currentDesiredTeamState :: UTCTime -> Conf -> ([Text], [Effect])
-currentDesiredTeamState time conf =
+currentResolvedRotationEffects :: UTCTime -> Conf -> ResolvedRotationEffects
+currentResolvedRotationEffects time conf =
   ( resolveRotation $ rotation conf,
     effects conf
   )

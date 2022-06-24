@@ -4,8 +4,8 @@ module ConfigSpec (spec) where
 
 import Config
   ( Conf,
-    Group (..),
-    currentGroups,
+    Effect (..),
+    currentResolvedRotationEffects,
     runConfig,
   )
 import qualified Config (parse)
@@ -23,42 +23,64 @@ import Prelude hiding (lines, readFile, unlines)
 
 spec :: Spec
 spec = do
-  it "returns no groups without SetSlackGroup effect" $ do
+  it "returns no ResolvedRotationEffects for an empty list of effects" $ do
     confList <-
       parseConfList
         [trimming|
-        let Effect = ./src/Effect.dhall
-        let Rotation = ./src/Rotation.dhall
-         in [ { rotation = Rotation.Const ["whatever"]
-              , effects = [] : List Effect
-              }
-            ]
-      |]
+          let Effect = ./src/Effect.dhall
+          let Rotation = ./src/Rotation.dhall
+           in [ { rotation = Rotation.Const ["whatever"]
+                , effects = [] : List Effect
+                }
+              ]
+        |]
     time <- iso8601ParseM "2021-10-10T00:00:00Z"
 
-    let groups = currentGroups time confList
-    groups `shouldMatchList` []
+    let resolvedRotationEffectsList = currentResolvedRotationEffects time <$> confList
+    resolvedRotationEffectsList
+      `shouldMatchList` [ ( ["whatever"],
+                            []
+                          )
+                        ]
 
   it "returns a group with SetSlackGroup effect" $ do
     confList <-
       parseConfList
         [trimming|
-        let Effect = ./src/Effect.dhall
-        let Rotation = ./src/Rotation.dhall
-         in [ { rotation = Rotation.Const ["user-id"]
-              , effects = [ Effect.SetSlackGroup "group-name" ]
-              }
-            ]
-      |]
+          let Effect = ./src/Effect.dhall
+          let Rotation = ./src/Rotation.dhall
+           in [ { rotation = Rotation.Const ["user-id"]
+                , effects = [ Effect.SetSlackGroup "group-name" ]
+                }
+              ]
+        |]
     time <- iso8601ParseM "2021-10-10T00:00:00Z"
 
-    let groups = currentGroups time confList
-    groups
-      `shouldMatchList` [ Group
-                            { handle = "group-name",
-                              description = "mock-description",
-                              memberIDs = Set.fromList ["user-id"]
-                            }
+    let resolvedRotationEffectsList = currentResolvedRotationEffects time <$> confList
+    resolvedRotationEffectsList
+      `shouldMatchList` [ ( ["user-id"],
+                            [SetSlackGroup "group-name"]
+                          )
+                        ]
+
+  it "resolves weekly rotation" $ do
+    confList <-
+      parseConfList
+        [trimming|
+          let Effect = ./src/Effect.dhall
+          let Rotation = ./src/Rotation.dhall
+           in [ { rotation = Rotation.Weekly [["user-id-one", "user-id-two"]]
+                , effects = [ Effect.SetSlackGroup "group-name" ]
+                }
+              ]
+        |]
+    time <- iso8601ParseM "2021-10-10T00:00:00Z"
+
+    let resolvedRotationEffectsList = currentResolvedRotationEffects time <$> confList
+    resolvedRotationEffectsList
+      `shouldMatchList` [ ( ["user-id-one"],
+                            [SetSlackGroup "group-name"]
+                          )
                         ]
 
 parseConfList :: Text -> IO [Conf]

@@ -11,7 +11,6 @@ import qualified Data.Map as Map
 import Data.Text (Text, intercalate)
 import Data.Time.Clock (UTCTime)
 import Data.Time.Format.ISO8601 (iso8601ParseM)
-import Effect (SetSlackChannelTopicRecord (..))
 import IO (Time (..))
 import Lib (dryRunEnsure, ensure, listUsers)
 import NeatInterpolation (trimming)
@@ -63,11 +62,9 @@ spec = do
                 effects =
                   [ SetSlackGroup "team-caretaker",
                     SetSlackChannelTopic
-                      ( SetSlackChannelTopicRecord
-                          { name = "tm-team",
-                            topic = const "topic"
-                          }
-                      )
+                      { name = "tm-team",
+                        topic = const "topic"
+                      }
                   ]
               }
           ]
@@ -86,11 +83,9 @@ spec = do
                 effects =
                   [ SetSlackGroup "team-caretaker",
                     SetSlackChannelTopic
-                      ( SetSlackChannelTopicRecord
-                          { name = "tm-team",
-                            topic = const "topic"
-                          }
-                      )
+                      { name = "tm-team",
+                        topic = const "topic"
+                      }
                   ]
               },
             Conf
@@ -132,11 +127,9 @@ spec = do
                 effects =
                   [ SetSlackGroup "design-caretaker",
                     SetSlackChannelTopic
-                      ( SetSlackChannelTopicRecord
-                          { name = "tm-design",
-                            topic = ("Caretaker is: " <>) . intercalate ", "
-                          }
-                      )
+                      { name = "tm-design",
+                        topic = ("Caretaker is: " <>) . intercalate ", "
+                      }
                   ]
               },
             Conf

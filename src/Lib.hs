@@ -7,14 +7,15 @@ module Lib
   )
 where
 
+import Data.Time.Clock (UTCTime)
 import Config
   ( Config,
-    DesiredTeamState (..),
-    Group (..),
+    ResolvedRotationEffects,
     Conf (..),
-    currentDesiredTeamState,
+    Effect (..),
+    currentResolvedRotationEffects,
     runConfig,
-    showDesiredTeamStateList,
+    showResolvedRotationEffectsList,
   )
 import qualified Config (parse)
 import Control.Category ((>>>))
@@ -110,10 +111,11 @@ ensure ::
   Text ->
   Sem r Text
 ensure inputText = do
-  records <- Config.parse inputText
+  confList <- Config.parse inputText
   getDisplayName <- getDisplayNameM
   findChannel <- findChannelM
-  teamResults <- traverse (wrapTeamResult $ ensureTeamState getDisplayName findChannel) records
+  time <- Time.getCurrent
+  teamResults <- traverse (wrapTeamResult $ applyConf getDisplayName findChannel time) confList
   return $ unlines teamResults
   where
     wrapTeamResult f record = "Team MOCK: success!" <$ f record
@@ -128,9 +130,9 @@ dryRunEnsure ::
   Sem r Text
 dryRunEnsure inputText = do
   time <- Time.getCurrent
-  desiredStateList <- currentDesiredTeamState time <<$>> Config.parse inputText
+  resolvedRotationEffectsList <- currentResolvedRotationEffects time <<$>> Config.parse inputText
   getDisplayName <- getDisplayNameM
-  showDesiredTeamStateList (unGetDisplayName getDisplayName) desiredStateList
+  showResolvedRotationEffectsList (unGetDisplayName getDisplayName) resolvedRotationEffectsList
 
 listUsers :: Member Users r => Sem r Text
 listUsers = do
@@ -138,42 +140,60 @@ listUsers = do
   where
     formatLine user = pack $ printf "%s: %s" (user ^. User.id) (user ^. displayName)
 
-ensureTeamState ::
-  ( Member Time r,
-    Member (Error Text) r,
+applyConf ::
+  ( Member (Error Text) r,
     Member Channels r,
     Member Groups r
   ) =>
   GetDisplayName ->
   FindChannel ->
+  UTCTime ->
   Conf ->
   Sem r ()
-ensureTeamState getDisplayName findChannel record = do
-  time <- Time.getCurrent
-  let desiredTeamState = currentDesiredTeamState time record
-  -- channel <- findOrCreateChannel findChannel $ teamChannelName desiredTeamState
-  -- ensureChannelTopic getDisplayName channel desiredTeamState
-  -- let channelID = channel ^. Channel.id
-  -- traverse_ (ensureGroupState [channelID]) $ groupList desiredTeamState
-  return ()
+applyConf getDisplayName findChannel time conf = do
+  let (members, effects) = currentResolvedRotationEffects time conf
+  traverse_ (applyEffect getDisplayName findChannel time members) effects
 
-ensureChannelTopic ::
-  ( Member (Error Text) r,
-    Member Channels r
+  -- return ()
+  -- where
+
+applyEffect ::
+  ( Member (Error Text) r
   ) =>
   GetDisplayName ->
-  Channel ->
-  DesiredTeamState ->
+  FindChannel ->
+  UTCTime ->
+  [Text] ->
+  Effect ->
   Sem r ()
-ensureChannelTopic getDisplayName channel desiredTeamState = do
-  newTopic <- topicGivenDisplayNames desiredTeamState (unGetDisplayName getDisplayName)
-  unless (same currentTopic newTopic) $ Channels.setTopic channelID newTopic
-  where
-    channelID = channel ^. Channel.id
-    currentTopic = channel ^. Channel.topic
-    same oldTopic newTopic = oldTopic == newTopic || clean oldTopic == clean newTopic
-    clean = filter (not . potentialAddedChar)
-    potentialAddedChar c = c `elem` ['<', '>']
+applyEffect getDisplayName findChannel time members = \case
+  SetSlackGroup handle -> return ()
+  _ -> return ()
+
+
+
+-- channel <- findOrCreateChannel findChannel $ teamChannelName desiredTeamState
+-- ensureChannelTopic getDisplayName channel desiredTeamState
+-- let channelID = channel ^. Channel.id
+-- traverse_ (ensureGroupState [channelID]) $ groupList desiredTeamState
+
+-- ensureChannelTopic ::
+--   ( Member (Error Text) r,
+--     Member Channels r
+--   ) =>
+--   GetDisplayName ->
+--   Channel ->
+--   DesiredTeamState ->
+--   Sem r ()
+-- ensureChannelTopic getDisplayName channel desiredTeamState = do
+--   newTopic <- topicGivenDisplayNames desiredTeamState (unGetDisplayName getDisplayName)
+--   unless (same currentTopic newTopic) $ Channels.setTopic channelID newTopic
+--   where
+--     channelID = channel ^. Channel.id
+--     currentTopic = channel ^. Channel.topic
+--     same oldTopic newTopic = oldTopic == newTopic || clean oldTopic == clean newTopic
+--     clean = filter (not . potentialAddedChar)
+--     potentialAddedChar c = c `elem` ['<', '>']
 
 findOrCreateChannel ::
   Member Channels r =>
@@ -182,20 +202,20 @@ findOrCreateChannel ::
   Sem r Channel
 findOrCreateChannel findChannel name = maybe (Channels.create name) return (findChannel name)
 
-ensureGroupState :: Member Groups r => [Text] -> Group -> Sem r ()
-ensureGroupState defaultChannelIDs group = do
-  existingGroup <- Groups.find $ handle group
-  slackGroup <- maybe createNew return existingGroup
-  let groupID = slackGroup ^. Group.id
+-- ensureGroupState :: Member Groups r => [Text] -> Group -> Sem r ()
+-- ensureGroupState defaultChannelIDs group = do
+--   existingGroup <- Groups.find $ handle group
+--   slackGroup <- maybe createNew return existingGroup
+--   let groupID = slackGroup ^. Group.id
 
-  currentMembers <- Set.fromList <$> Groups.getMembers groupID
-  unless (memberIDs group == currentMembers) $ Groups.setMembers groupID $ Set.toList $ memberIDs group
+--   currentMembers <- Set.fromList <$> Groups.getMembers groupID
+--   unless (memberIDs group == currentMembers) $ Groups.setMembers groupID $ Set.toList $ memberIDs group
 
-  let currentChannels = slackGroup ^. channelIDs
-  unless (same defaultChannelIDs currentChannels) $ Groups.setChannels groupID defaultChannelIDs
-  where
-    createNew = Groups.create (handle group) (description group) defaultChannelIDs
-    same a b = null (a \\ b) && null (b \\ a)
+--   let currentChannels = slackGroup ^. channelIDs
+--   unless (same defaultChannelIDs currentChannels) $ Groups.setChannels groupID defaultChannelIDs
+--   where
+--     createNew = Groups.create (handle group) (description group) defaultChannelIDs
+--     same a b = null (a \\ b) && null (b \\ a)
 
 getDisplayNameM :: Member Users r => Sem r GetDisplayName
 getDisplayNameM = do

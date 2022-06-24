@@ -155,11 +155,9 @@ applyConf getDisplayName findChannel time conf = do
   let (members, effects) = currentResolvedRotationEffects time conf
   traverse_ (applyEffect getDisplayName findChannel time members) effects
 
-  -- return ()
-  -- where
-
 applyEffect ::
-  ( Member (Error Text) r
+  ( Member (Error Text) r,
+    Member Groups r
   ) =>
   GetDisplayName ->
   FindChannel ->
@@ -168,7 +166,20 @@ applyEffect ::
   Effect ->
   Sem r ()
 applyEffect getDisplayName findChannel time members = \case
-  SetSlackGroup handle -> return ()
+  SetSlackGroup handle -> do
+    existingGroup <- Groups.find handle
+    slackGroup <- maybe createNew return existingGroup
+    let groupID = slackGroup ^. Group.id
+
+    currentMembers <- Set.fromList <$> Groups.getMembers groupID
+    unless (members == currentMembers) $ Groups.setMembers groupID $ Set.toList members
+
+    let currentChannels = slackGroup ^. channelIDs
+    unless (same defaultChannelIDs currentChannels) $ Groups.setChannels groupID defaultChannelIDs
+    where
+      defaultChannelIDs = []
+      createNew = Groups.create handle "mock-description" defaultChannelIDs
+      same a b = null (a \\ b) && null (b \\ a)
   _ -> return ()
 
 
@@ -202,21 +213,6 @@ findOrCreateChannel ::
   Text ->
   Sem r Channel
 findOrCreateChannel findChannel name = maybe (Channels.create name) return (findChannel name)
-
--- ensureGroupState :: Member Groups r => [Text] -> Group -> Sem r ()
--- ensureGroupState defaultChannelIDs group = do
---   existingGroup <- Groups.find $ handle group
---   slackGroup <- maybe createNew return existingGroup
---   let groupID = slackGroup ^. Group.id
-
---   currentMembers <- Set.fromList <$> Groups.getMembers groupID
---   unless (memberIDs group == currentMembers) $ Groups.setMembers groupID $ Set.toList $ memberIDs group
-
---   let currentChannels = slackGroup ^. channelIDs
---   unless (same defaultChannelIDs currentChannels) $ Groups.setChannels groupID defaultChannelIDs
---   where
---     createNew = Groups.create (handle group) (description group) defaultChannelIDs
---     same a b = null (a \\ b) && null (b \\ a)
 
 getDisplayNameM :: Member Users r => Sem r GetDisplayName
 getDisplayNameM = do

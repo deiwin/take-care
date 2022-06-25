@@ -157,7 +157,8 @@ applyConf getDisplayName findChannel time conf = do
 
 applyEffect ::
   ( Member (Error Text) r,
-    Member Groups r
+    Member Groups r,
+    Member Channels r
   ) =>
   GetDisplayName ->
   FindChannel ->
@@ -166,9 +167,10 @@ applyEffect ::
   Effect ->
   Sem r ()
 applyEffect getDisplayName findChannel time members = \case
-  SetSlackGroup{handle, name} -> do
+  SetSlackGroup{handle, name, channels} -> do
     existingGroup <- Groups.find handle
-    slackGroup <- maybe createNew return existingGroup
+    defaultChannelIDs <- (^. Channel.id) <<$>> traverse (findOrCreateChannel findChannel) channels
+    slackGroup <- maybe (createNew defaultChannelIDs) return existingGroup
     let groupID = slackGroup ^. Group.id
 
     currentMembers <- Set.fromList <$> Groups.getMembers groupID
@@ -177,8 +179,7 @@ applyEffect getDisplayName findChannel time members = \case
     let currentChannels = slackGroup ^. channelIDs
     unless (same defaultChannelIDs currentChannels) $ Groups.setChannels groupID defaultChannelIDs
     where
-      defaultChannelIDs = []
-      createNew = Groups.create handle name defaultChannelIDs
+      createNew = Groups.create handle name
       same a b = null (a \\ b) && null (b \\ a)
   _ -> return ()
 

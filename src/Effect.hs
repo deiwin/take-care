@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 
 module Effect
@@ -26,10 +25,10 @@ data Effect
       { name :: Text,
         topic :: [Text] -> Text
       }
-  | InviteToSlackChannel Text
   | SetSlackGroup
       { handle :: Text,
-        name :: Text
+        name :: Text,
+        channels :: [Text]
       }
   deriving (Generic, Show, Eq)
 

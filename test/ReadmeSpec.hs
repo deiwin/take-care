@@ -41,15 +41,16 @@ spec = do
                                 },
                               SetSlackGroup
                                 { handle = "design-caretaker",
-                                  name = "Team design caretaker(s)"
+                                  name = "Team design caretaker(s)",
+                                  channels = []
                                 }
                             ]
                           ),
                           ( Set.fromList ["U111ALICE", "U22222BOB", "U333CAROL", "U4444DAVE"],
-                            [ InviteToSlackChannel "tm-design",
-                              SetSlackGroup
+                            [ SetSlackGroup
                                 { handle = "design-team",
-                                  name = "Team design"
+                                  name = "Team design",
+                                  channels = ["tm-design"]
                                 }
                             ]
                           ),
@@ -60,15 +61,16 @@ spec = do
                                 },
                               SetSlackGroup
                                 { handle = "dev-caretaker",
-                                  name = "Team dev caretaker(s)"
+                                  name = "Team dev caretaker(s)",
+                                  channels = []
                                 }
                             ]
                           ),
                           ( Set.fromList ["U55555EVE", "U6666FAYE", "U77777GIL", "U88888HAL"],
-                            [ InviteToSlackChannel "tm-dev",
-                              SetSlackGroup
+                            [ SetSlackGroup
                                 { handle = "dev-team",
-                                  name = "Team dev"
+                                  name = "Team dev",
+                                  channels = ["tm-dev"]
                                 }
                             ]
                           )

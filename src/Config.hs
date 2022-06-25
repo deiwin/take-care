@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -83,8 +81,8 @@ showResolvedRotationEffects getDisplayName (members, effects) = interUnlines <$>
           & traverse getDisplayName
           <&> topic
           <&> printf "SetSlackChannelTopic #%s: %s" name
-      InviteToSlackChannel name -> return $ printf "InviteToSlackChannel: #%s" name
-      SetSlackGroup{handle, name} -> return $ printf "SetSlackGroup: @%s (%s)" handle name
+      SetSlackGroup{handle, name, channels} ->
+        return $ printf "SetSlackGroup: @%s {name = \"%s\", channels = %s}" handle name (show channels)
 
 padLeft :: Int -> Text -> Text
 padLeft spaces = fmapLines (prefix <>)

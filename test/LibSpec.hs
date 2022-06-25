@@ -62,7 +62,8 @@ spec = do
                 effects =
                   [ SetSlackGroup
                       { handle = "team-caretaker",
-                        name = "Team team caretaker(s)"
+                        name = "Team team caretaker(s)",
+                        channels = []
                       },
                     SetSlackChannelTopic
                       { name = "tm-team",
@@ -86,7 +87,8 @@ spec = do
                 effects =
                   [ SetSlackGroup
                       { handle = "team-caretaker",
-                        name = "Team team caretaker(s)"
+                        name = "Team team caretaker(s)",
+                        channels = []
                       },
                     SetSlackChannelTopic
                       { name = "tm-team",
@@ -99,9 +101,9 @@ spec = do
                 effects =
                   [ SetSlackGroup
                       { handle = "team-team",
-                        name = "Team team"
-                      },
-                    InviteToSlackChannel "tm-team"
+                        name = "Team team",
+                        channels = ["tm-team"]
+                      }
                   ]
               }
           ]
@@ -117,12 +119,11 @@ spec = do
               Right
                 [trimming|
                   For Alice:
-                    SetSlackGroup: @team-caretaker (Team team caretaker(s))
+                    SetSlackGroup: @team-caretaker {name = "Team team caretaker(s)", channels = []}
                     SetSlackChannelTopic #tm-team: topic
 
                   For Alice, Bob, Caroline:
-                    SetSlackGroup: @team-team (Team team)
-                    InviteToSlackChannel: #tm-team
+                    SetSlackGroup: @team-team {name = "Team team", channels = ["tm-team"]}
                 |]
           )
 
@@ -136,7 +137,8 @@ spec = do
                 effects =
                   [ SetSlackGroup
                       { handle = "design-caretaker",
-                        name = "Team design caretaker(s)"
+                        name = "Team design caretaker(s)",
+                        channels = []
                       },
                     SetSlackChannelTopic
                       { name = "tm-design",
@@ -149,9 +151,9 @@ spec = do
                 effects =
                   [ SetSlackGroup
                       { handle = "design-team",
-                        name = "Team design"
-                      },
-                    InviteToSlackChannel "tm-design"
+                        name = "Team design",
+                        channels = ["tm-design"]
+                      }
                   ]
               }
           ]
@@ -173,7 +175,7 @@ spec = do
                             { _id = "id_design-caretaker",
                               _handle = "design-caretaker",
                               _name = "Team design caretaker(s)",
-                              _channelIDs = ["id_tm-design"]
+                              _channelIDs = []
                             },
                           ["alice"]
                         )

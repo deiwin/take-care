@@ -53,6 +53,7 @@ spec = do
                 , effects = [ Effect.SetSlackGroup
                                 { handle = "group-handle"
                                 , name = "group-name"
+                                , channels = ["channel-name"]
                                 }
                             ]
                 }
@@ -65,7 +66,8 @@ spec = do
       `shouldMatchList` [ ( Set.fromList ["user-id"],
                             [ SetSlackGroup
                                 { handle = "group-handle",
-                                  name = "group-name"
+                                  name = "group-name",
+                                  channels = ["channel-name"]
                                 }
                             ]
                           )
@@ -81,6 +83,7 @@ spec = do
                 , effects = [ Effect.SetSlackGroup
                                 { handle = "group-handle"
                                 , name = "group-name"
+                                , channels = ["channel-name"]
                                 }
                             ]
                 }
@@ -93,7 +96,8 @@ spec = do
       `shouldMatchList` [ ( Set.fromList ["user-id-one"],
                             [ SetSlackGroup
                                 { handle = "group-handle",
-                                  name = "group-name"
+                                  name = "group-name",
+                                  channels = ["channel-name"]
                                 }
                             ]
                           )

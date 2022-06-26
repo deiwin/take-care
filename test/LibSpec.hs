@@ -205,21 +205,98 @@ spec = do
                 )
           )
 
+    it "does not try to create the same channel twice" $ do
+      time <- iso8601ParseM "2021-10-10T00:00:00Z"
+      ensure "ignored"
+        & runConfigConst
+          [ Conf
+              { rotation = Const ["user-name"],
+                effects =
+                  [ SetSlackGroup
+                      { handle = "group-handle",
+                        name = "group-name",
+                        channels = ["channel-name"]
+                      }
+                  , SetSlackGroup
+                      { handle = "second-group-handle",
+                        name = "second-group-name",
+                        channels = ["channel-name"]
+                      }
+                  ]
+              }
+          ]
+        & runTimeConst time
+        & runListUsersConst
+          [ User {_id = "user-name", _displayName = "user-display-name"} ]
+        & runChannels Map.empty
+        & runGroups Map.empty
+        & runError
+        & run
+        & ( `shouldBe`
+              Right
+                ( Map.fromList
+                    [ ( "id_group-handle",
+                        ( Group
+                            { _id = "id_group-handle",
+                              _handle = "group-handle",
+                              _name = "group-name",
+                              _channelIDs = ["id_channel-name"]
+                            },
+                          ["user-name"]
+                        )
+                      ),
+                      ( "id_second-group-handle",
+                        ( Group
+                            { _id = "id_second-group-handle",
+                              _handle = "second-group-handle",
+                              _name = "second-group-name",
+                              _channelIDs = ["id_channel-name"]
+                            },
+                          ["user-name"]
+                        )
+                      )
+                    ],
+                  ( Map.fromList
+                      [ ( "id_channel-name",
+                          Channel
+                            { _id = "id_channel-name",
+                              _name = "channel-name",
+                              _topic = ""
+                            }
+                        )
+                      ],
+                    "Team MOCK: success!\n"
+                  )
+                )
+          )
+
 type ChannelStore = (Map Text Channel)
 
-runChannels :: ChannelStore -> Sem (Channels ': State ChannelStore ': r) a -> Sem r (ChannelStore, a)
+runChannels ::
+  Member (Error Text) r =>
+  ChannelStore ->
+  Sem (Channels ': State ChannelStore ': r) a ->
+  Sem r (ChannelStore, a)
 runChannels initialState =
   stateInterpreter
     >>> runState initialState
   where
-    stateInterpreter :: Member (State ChannelStore) r => InterpreterFor Channels r
+    stateInterpreter ::
+      ( Member (State ChannelStore) r,
+        Member (Error Text) r
+      ) =>
+      InterpreterFor Channels r
     stateInterpreter = interpret \case
       C.Create name ->
         let id = "id_" <> name
             channel = Channel {_id = id, _name = name, _topic = ""}
          in do
-              modify $ Map.insert id channel
-              return channel
+              map <- get
+              case Map.lookup id map of
+                Just _ -> throw ("Trying to create a channel that already exists with ID: " <> id)
+                Nothing -> do
+                  put $ Map.insert id channel map
+                  return channel
       C.ListAll -> Map.elems <$> get
       SetTopic id topic ->
         let updateTopic channel = channel {_topic = topic}
@@ -260,8 +337,12 @@ runGroups initialState =
             group = Group {_id = groupID, _handle = handle, _name = name, _channelIDs = defaultChannelIDs}
             members = []
          in do
-              modify $ Map.insert groupID (group, members)
-              return group
+              map <- get
+              case Map.lookup groupID map of
+                Just _ -> throw ("Trying to create a group that already exists with ID: " <> groupID)
+                Nothing -> do
+                  put $ Map.insert groupID (group, members) map
+                  return group
       Find handle -> fmap fst . Map.lookup ("id_" <> handle) <$> get
 
 runConfigConst :: [Conf] -> InterpreterFor Config r

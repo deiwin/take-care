@@ -153,7 +153,7 @@ applyConf ::
   Sem r ()
 applyConf getDisplayName findChannel time conf = do
   let (members, effects) = currentResolvedRotationEffects time conf
-  traverse_ (applyEffect getDisplayName findChannel time members) effects
+  traverse_ (applyEffect getDisplayName findChannel members) effects
 
 applyEffect ::
   ( Member (Error Text) r,
@@ -162,11 +162,10 @@ applyEffect ::
   ) =>
   GetDisplayName ->
   FindChannel ->
-  UTCTime ->
   Set Text ->
   Effect ->
   Sem r ()
-applyEffect getDisplayName findChannel time members = \case
+applyEffect getDisplayName findChannel members = \case
   SetSlackGroup{handle, name, channels} -> do
     existingGroup <- Groups.find handle
     defaultChannelIDs <- (^. Channel.id) <<$>> traverse (findOrCreateChannel findChannel) channels

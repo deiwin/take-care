@@ -3,13 +3,15 @@
 module Slack.ChannelSpec (spec) where
 
 import Control.Lens ((&), (^.))
+import Data.IORef (newIORef, readIORef, writeIORef)
 import NeatInterpolation (trimming)
 import Network.Wreq (params)
 import Slack.Channel
   ( Channel (..),
+    Effects,
     runChannels,
   )
-import qualified Slack.Channel as Channels (create, listAll, setTopic)
+import qualified Slack.Channel as Channels (create, find, setTopic)
 import Slack.TestUtils
   ( SlackResponse (..),
     nullSlackMatch,
@@ -28,53 +30,53 @@ import Test.Hspec
 
 spec :: Spec
 spec = do
-  describe "listAll" $ do
+  describe "find" $ do
     it "queries conversations.list" $ do
-      Channels.listAll
+      Channels.find "name"
         & runWithExpectations \case
           GetPaginated _ method -> method `shouldBe` "conversations.list"
           _ -> expectationFailure "Expected a GetPaginated query"
 
     it "sets response limit to 1000" $ do
-      Channels.listAll
+      Channels.find "name"
         & runWithExpectations \case
           GetPaginated opts _ -> opts ^. params `shouldContain` [("limit", "1000")]
           _ -> expectationFailure "Expected a GetPaginated query"
 
     it "excludes archived channels" $ do
-      Channels.listAll
+      Channels.find "name"
         & runWithExpectations \case
           GetPaginated opts _ -> opts ^. params `shouldContain` [("exclude_archived", "true")]
           _ -> expectationFailure "Expected a GetPaginated query"
 
     it "includes public and private channels" $ do
-      Channels.listAll
+      Channels.find "name"
         & runWithExpectations \case
           GetPaginated opts _ -> opts ^. params `shouldContain` [("types", "public_channel,private_channel")]
           _ -> expectationFailure "Expected a GetPaginated query"
 
     it "fails on a response of an empty object" $ do
-      Channels.listAll
+      Channels.find "name"
         & runGetPaginatedConst ["{}"]
         & (`shouldBe` Left "\"conversations.list\" response didn't include a \"channels\" field")
 
-    it "retuns an empty list if the list of channels is empty" $ do
-      Channels.listAll
+    it "retuns Nothing if the list of channels is empty" $ do
+      Channels.find "name"
         & runGetPaginatedConst ["{\"channels\": []}"]
-        & (`shouldBe` Right [])
+        & (`shouldBe` Right Nothing)
 
     it "fails if channel object does not have an 'id' key" $ do
-      Channels.listAll
+      Channels.find "name"
         & runGetPaginatedConst ["{\"channels\": [{}]}"]
         & (`shouldBe` Left "key \"id\" not found")
 
     it "fails if channel object does not have a 'name' key" $ do
-      Channels.listAll
+      Channels.find "name"
         & runGetPaginatedConst ["{\"channels\": [{\"id\": \"something\"}]}"]
         & (`shouldBe` Left "key \"name\" not found")
 
     it "fails if channel object does not have a 'topic' key" $ do
-      Channels.listAll
+      Channels.find "name"
         & runGetPaginatedConst
           [ [trimming|
             {
@@ -88,7 +90,7 @@ spec = do
         & (`shouldBe` Left "key \"topic\" not found")
 
     it "fails if 'topic' key is not an object" $ do
-      Channels.listAll
+      Channels.find "name"
         & runGetPaginatedConst
           [ [trimming|
             {
@@ -103,7 +105,7 @@ spec = do
         & (`shouldBe` Left "parsing KeyMap failed, expected Object, but encountered String")
 
     it "fails if topic object does not have a 'value' key" $ do
-      Channels.listAll
+      Channels.find "name"
         & runGetPaginatedConst
           [ [trimming|
             {
@@ -117,8 +119,25 @@ spec = do
           ]
         & (`shouldBe` Left "key \"value\" not found")
 
-    it "returns the channels in the response" $ do
-      Channels.listAll
+    it "returns nothing if the channels in the response don't match the name" $ do
+      Channels.find "seatch_name"
+        & runGetPaginatedConst
+          [ [trimming|
+            {
+              "channels": [{
+                "id": "id",
+                "name": "other_name",
+                "topic": {
+                  "value": "topic"
+                }
+              }]
+            }
+          |]
+          ]
+        & (`shouldBe` Right Nothing)
+
+    it "finds channel with a matching name" $ do
+      Channels.find "name"
         & runGetPaginatedConst
           [ [trimming|
             {
@@ -132,10 +151,10 @@ spec = do
             }
           |]
           ]
-        & (`shouldBe` Right [Channel {_id = "id", _name = "name", _topic = "topic"}])
+        & (`shouldBe` Right (Just Channel {_id = "id", _name = "name", _topic = "topic"}))
 
-    it "returns the channels on multiple pages" $ do
-      Channels.listAll
+    it "finds channel with a matching name on the second page" $ do
+      Channels.find "page2_channel"
         & runGetPaginatedConst
           [ [trimming|
               {
@@ -160,12 +179,21 @@ spec = do
               }
             |]
           ]
-        & ( `shouldBe`
-              Right
-                [ Channel {_id = "id1", _name = "page1_channel", _topic = "topic1"},
-                  Channel {_id = "id2", _name = "page2_channel", _topic = "topic2"}
-                ]
-          )
+        & (`shouldBe` Right (Just Channel {_id = "id2", _name = "page2_channel", _topic = "topic2"}))
+
+    it "only calls conversations.list once for multiple find calls" $ do
+      let program =
+            do
+              first <- Channels.find "first"
+              second <- Channels.find "second"
+              return (first, second)
+      countRef <- newIORef 0
+      program
+        & runWithExpectations \case
+          GetPaginated _ _ -> readIORef countRef >>= writeIORef countRef . (+ 1)
+          _ -> expectationFailure "Expected a GetPaginated query"
+      count <- readIORef countRef
+      count `shouldBe` 1
 
   describe "create" $ do
     it "posts to conversations.create" $ do
@@ -230,7 +258,7 @@ spec = do
         & runPostConst "{\"whatever\": {}}"
         & (`shouldBe` Right ())
 
-runWithExpectations = runSlackWithExpectations runChannels
+runWithExpectations = runSlackWithExpectations @Effects runChannels
 
 runPostConst page = runSlackWith runChannels (nullSlackMatch {postResponse = Just page})
 

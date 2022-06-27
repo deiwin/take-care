@@ -1,3 +1,5 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+
 module Slack.TestUtils
   ( runSlackWith,
     nullSlackMatch,
@@ -16,6 +18,7 @@ import Data.Text (Text)
 import Data.Text.Encoding (encodeUtf8)
 import Polysemy (Embed, InterpreterFor, Member, Sem, embed, interpret, run, runM)
 import Polysemy.Error (Error, note, runError)
+import Polysemy.Internal (Append)
 import Slack.Util (Slack (..))
 import Test.Hspec (Expectation)
 
@@ -31,9 +34,9 @@ runSlackWith runToSlack slackResponse =
     >>> run
 
 runSlackWithExpectations ::
-  (Sem '[slackEff, Slack, Error Text, Embed IO] a -> Sem '[Slack, Error Text, Embed IO] a) ->
+  (Sem (Append slackEffs '[Slack, Error Text, Embed IO]) a -> Sem '[Slack, Error Text, Embed IO] a) ->
   (forall rInitial x. (Slack (Sem rInitial) x -> IO ())) ->
-  Sem '[slackEff, Slack, Error Text, Embed IO] a ->
+  Sem (Append slackEffs '[Slack, Error Text, Embed IO]) a ->
   Expectation
 runSlackWithExpectations runToSlack expectations =
   runToSlack

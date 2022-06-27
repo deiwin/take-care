@@ -7,6 +7,7 @@ import NeatInterpolation (trimming)
 import Network.Wreq (params)
 import Slack.Group
   ( Group (..),
+    Groups,
     runGroups,
   )
 import qualified Slack.Group as Groups
@@ -304,7 +305,7 @@ spec = do
                 )
           )
 
-runWithExpectations = runSlackWithExpectations runGroups
+runWithExpectations = runSlackWithExpectations @'[Groups] runGroups
 
 runPostConst page = runSlackWith runGroups (nullSlackMatch {postResponse = Just page})
 

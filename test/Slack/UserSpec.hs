@@ -12,6 +12,7 @@ import Slack.TestUtils
   )
 import Slack.User
   ( User (..),
+    Users,
     runUsers,
   )
 import qualified Slack.User as Users (listAll)
@@ -160,6 +161,6 @@ spec = do
           ]
         & (`shouldBe` Right [User {_id = "id", _displayName = "@display_name"}])
 
-runWithExpectations = runSlackWithExpectations runUsers
+runWithExpectations = runSlackWithExpectations @'[Users] runUsers
 
 runGetPaginatedConst pages = runSlackWith runUsers (nullSlackMatch {getPaginatedResponse = Just pages})

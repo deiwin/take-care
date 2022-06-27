@@ -19,9 +19,9 @@ import qualified Polysemy as P (Members)
 import Polysemy.Error (Error, note, runError, throw)
 import Polysemy.State (State, get, modify, put, runState)
 import Slack.Channel (Channel (..), Channels (..))
-import qualified Slack.Channel as C (Channels (Create, ListAll))
+import qualified Slack.Channel as C (Channels (Create, Find))
 import Slack.Group (Group (..), Groups (..))
-import qualified Slack.Group as G (Groups (Create))
+import qualified Slack.Group as G (Groups (Create, Find))
 import Slack.User (User (..), Users (..))
 import qualified Slack.User as U (Users (ListAll))
 import Test.Hspec
@@ -297,10 +297,10 @@ runChannels initialState =
                 Nothing -> do
                   put $ Map.insert id channel map
                   return channel
-      C.ListAll -> Map.elems <$> get
       SetTopic id topic ->
         let updateTopic channel = channel {_topic = topic}
          in modify $ Map.adjust updateTopic id
+      C.Find name -> Map.lookup ("id_" <> name) <$> get
 
 type GroupStore = (Map Text (Group, [Text]))
 
@@ -343,7 +343,7 @@ runGroups initialState =
                 Nothing -> do
                   put $ Map.insert groupID (group, members) map
                   return group
-      Find handle -> fmap fst . Map.lookup ("id_" <> handle) <$> get
+      G.Find handle -> fmap fst . Map.lookup ("id_" <> handle) <$> get
 
 runConfigConst :: [Conf] -> InterpreterFor Config r
 runConfigConst teams = interpret \case

@@ -2,6 +2,7 @@
 
 module LibSpec (spec) where
 
+import Control.Lens ((^.))
 import Config (Conf (..), Config (..), Effect (..), Rotation (..))
 import Control.Arrow (first, second)
 import Control.Category ((>>>))
@@ -23,7 +24,8 @@ import qualified Slack.Channel as C (Channels (Create, Find))
 import Slack.Group (Group (..), Groups (..))
 import qualified Slack.Group as G (Groups (Create, Find))
 import Slack.User (User (..), Users (..))
-import qualified Slack.User as U (Users (ListAll))
+import qualified Slack.User as U (Users (Find, ListAll), id)
+import Data.List (find)
 import Test.Hspec
   ( Spec,
     describe,
@@ -355,4 +357,5 @@ runTimeConst time = interpret \case
 
 runListUsersConst :: [User] -> InterpreterFor Users r
 runListUsersConst users = interpret \case
+  U.Find idToFind -> return $ find ((== idToFind) . (^. U.id)) users
   U.ListAll -> return users

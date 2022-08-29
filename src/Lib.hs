@@ -20,16 +20,15 @@ import Control.Category ((>>>))
 import Control.Lens ((^.))
 import Control.Monad (unless)
 import Data.Foldable (traverse_)
-import Data.Function ((&))
+import Data.Functor ((<&>))
 import Data.List ((\\))
-import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Text (Text, filter, pack, unlines)
 import Data.Time.Clock (UTCTime)
 import IO (Env, Time, runEnv, runTime)
 import qualified IO as Time (getCurrent)
-import Polysemy (Embed, Final, Member, Sem, embedToFinal, runFinal)
+import Polysemy (Embed, Final, Member, Members, Sem, embedToFinal, runFinal)
 import Polysemy.Error (Error, errorToIOFinal, note)
 import Polysemy.Input (Input)
 import Slack.Channel as Channel
@@ -59,15 +58,12 @@ import Slack.User as User
     id,
     runUsers,
   )
-import qualified Slack.User as Users (listAll)
+import qualified Slack.User as User (Effects)
+import qualified Slack.User as Users (find, listAll)
 import Slack.Util (NetCtx, Slack, runNetCtx, runSlack)
 import Text.Printf (printf)
 import Text.Show.Functions ()
 import Prelude hiding (filter, unlines)
-
-newtype GetDisplayName = GetDisplayName
-  { unGetDisplayName :: forall r. Member (Error Text) r => Text -> Sem r Text
-  }
 
 type family (++) (as :: [k]) (bs :: [k]) :: [k] where
   (++) a '[] = a
@@ -79,8 +75,8 @@ type CanonicalEffects =
      Config
    ]
     ++ Channel.Effects
-    ++ '[ Users,
-          Groups,
+    ++ User.Effects
+    ++ '[ Groups,
           Slack,
           Input NetCtx,
           Env,
@@ -115,9 +111,8 @@ ensure ::
   Sem r Text
 ensure inputText = do
   confList <- Config.parse inputText
-  getDisplayName <- getDisplayNameM
   time <- Time.getCurrent
-  teamResults <- traverse (wrapTeamResult $ applyConf getDisplayName time) confList
+  teamResults <- traverse (wrapTeamResult $ applyConf time) confList
   return $ unlines teamResults
   where
     wrapTeamResult f record = "Team MOCK: success!" <$ f record
@@ -133,8 +128,7 @@ dryRunEnsure ::
 dryRunEnsure inputText = do
   time <- Time.getCurrent
   resolvedRotationEffectsList <- currentResolvedRotationEffects time <<$>> Config.parse inputText
-  getDisplayName <- getDisplayNameM
-  showResolvedRotationEffectsList (unGetDisplayName getDisplayName) resolvedRotationEffectsList
+  showResolvedRotationEffectsList getDisplayName resolvedRotationEffectsList
 
 listUsers :: Member Users r => Sem r Text
 listUsers = do
@@ -145,26 +139,26 @@ listUsers = do
 applyConf ::
   ( Member (Error Text) r,
     Member Channels r,
+    Member Users r,
     Member Groups r
   ) =>
-  GetDisplayName ->
   UTCTime ->
   Conf ->
   Sem r ()
-applyConf getDisplayName time conf = do
+applyConf time conf = do
   let (members, effects) = currentResolvedRotationEffects time conf
-  traverse_ (applyEffect getDisplayName members) effects
+  traverse_ (applyEffect members) effects
 
 applyEffect ::
   ( Member (Error Text) r,
     Member Groups r,
-    Member Channels r
+    Member Channels r,
+    Member Users r
   ) =>
-  GetDisplayName ->
   Set Text ->
   Effect ->
   Sem r ()
-applyEffect getDisplayName members = \case
+applyEffect members = \case
   SetSlackGroup {handle, name, channels} -> do
     existingGroup <- Groups.find handle
     defaultChannelIDs <- (^. Channel.id) <<$>> traverse findOrCreateChannel channels
@@ -181,7 +175,7 @@ applyEffect getDisplayName members = \case
       same a b = null (a \\ b) && null (b \\ a)
   SetSlackChannelTopic {name, topic} -> do
     channel <- findOrCreateChannel name
-    newTopic <- topic <$> traverse (unGetDisplayName getDisplayName) (Set.toList members)
+    newTopic <- topic <$> traverse getDisplayName (Set.toList members)
     unless
       (same (channel ^. Channel.topic) newTopic)
       (Channels.setTopic (channel ^. Channel.id) newTopic)
@@ -190,19 +184,17 @@ applyEffect getDisplayName members = \case
       clean = filter (not . potentialAddedChar)
       potentialAddedChar c = c `elem` ['<', '>']
 
+getDisplayName :: Members '[Users, Error Text] r => Text -> Sem r Text
+getDisplayName id =
+  Users.find id
+    >>= note (pack (printf "Could not find user with ID: %s" id))
+    <&> (^. User.displayName)
+
 findOrCreateChannel ::
   Member Channels r =>
   Text ->
   Sem r Channel
 findOrCreateChannel name = Channels.find name >>= maybe (Channels.create name) return
-
-getDisplayNameM :: Member Users r => Sem r GetDisplayName
-getDisplayNameM = do
-  map <- Map.fromList . fmap toPair <$> Users.listAll
-  return $ GetDisplayName $ lookup map
-  where
-    lookup map id = Map.lookup id map & note (pack (printf "Could not find user with ID: %s" id))
-    toPair user = (user ^. User.id, user ^. displayName)
 
 infixl 4 <<$>>
 

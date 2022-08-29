@@ -2,7 +2,8 @@
 
 module Slack.UserSpec (spec) where
 
-import Control.Lens ((&))
+import Data.Function ((&))
+import Data.IORef (modifyIORef, newIORef, readIORef)
 import NeatInterpolation (trimming)
 import Slack.TestUtils
   ( SlackResponse (..),
@@ -11,11 +12,11 @@ import Slack.TestUtils
     runSlackWithExpectations,
   )
 import Slack.User
-  ( User (..),
-    Users,
+  ( Effects,
+    User (..),
     runUsers,
   )
-import qualified Slack.User as Users (listAll)
+import qualified Slack.User as Users (find, listAll)
 import Slack.Util (Slack (..))
 import Test.Hspec
   ( Spec,
@@ -161,6 +162,96 @@ spec = do
           ]
         & (`shouldBe` Right [User {_id = "id", _displayName = "@display_name"}])
 
-runWithExpectations = runSlackWithExpectations @'[Users] runUsers
+  describe "find" $ do
+    it "returns Nothing when user not found" $ do
+      Users.find "missing_id"
+        & runGetPaginatedConst
+          [ [trimming|
+              {
+                "members": [{
+                  "id": "id",
+                  "name": "name",
+                  "profile": {
+                    "display_name": "display_name"
+                  }
+                }, {
+                  "id": "id2",
+                  "name": "name2",
+                  "profile": {
+                    "display_name": "display_name2"
+                  }
+                }]
+              }
+            |]
+          ]
+        & (`shouldBe` Right Nothing)
+
+    it "returns the right user" $ do
+      Users.find "id2"
+        & runGetPaginatedConst
+          [ [trimming|
+              {
+                "members": [{
+                  "id": "id",
+                  "name": "name",
+                  "profile": {
+                    "display_name": "display_name"
+                  }
+                }, {
+                  "id": "id2",
+                  "name": "name2",
+                  "profile": {
+                    "display_name": "display_name2"
+                  }
+                }]
+              }
+            |]
+          ]
+        & (`shouldBe` Right (Just (User {_id = "id2", _displayName = "@display_name2"})))
+
+    it "returns the right user from the second page" $ do
+      Users.find "id2"
+        & runGetPaginatedConst
+          [ [trimming|
+              {
+                "members": [{
+                  "id": "id",
+                  "name": "name",
+                  "profile": {
+                    "display_name": "display_name"
+                  }
+                }]
+              }
+            |],
+            [trimming|
+              {
+                "members": [{
+                  "id": "id2",
+                  "name": "name2",
+                  "profile": {
+                    "display_name": "display_name2"
+                  }
+                }]
+              }
+            |]
+          ]
+        & (`shouldBe` Right (Just (User {_id = "id2", _displayName = "@display_name2"})))
+
+  it "only calls users.list once for multiple find and listAll calls" $ do
+    let program =
+          do
+            first <- Users.find "first_ID"
+            all <- Users.listAll
+            second <- Users.find "second_ID"
+            return (first, all, second)
+    countRef <- newIORef 0
+    program
+      & runWithExpectations \case
+        GetPaginated _ _ -> modifyIORef countRef (+ 1)
+        _ -> expectationFailure "Expected a GetPaginated query"
+    count <- readIORef countRef
+    count `shouldBe` 1
+
+runWithExpectations = runSlackWithExpectations @Effects runUsers
 
 runGetPaginatedConst pages = runSlackWith runUsers (nullSlackMatch {getPaginatedResponse = Just pages})

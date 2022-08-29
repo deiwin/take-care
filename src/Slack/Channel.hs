@@ -63,7 +63,7 @@ type Effects =
      State ChannelStore
    ]
 
-runChannels :: Members '[Slack, Error Text] r => InterpretersFor '[Channels, State ChannelStore] r
+runChannels :: Members '[Slack, Error Text] r => InterpretersFor Effects r
 runChannels = evalState (False, Map.empty, Map.empty) . interpretWithCache
   where
     interpretWithCache :: Members '[Slack, Error Text, State ChannelStore] r => InterpreterFor Channels r

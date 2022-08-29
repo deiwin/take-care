@@ -3,7 +3,7 @@
 module Slack.ChannelSpec (spec) where
 
 import Control.Lens ((&), (^.))
-import Data.IORef (newIORef, readIORef, writeIORef)
+import Data.IORef (modifyIORef, newIORef, readIORef)
 import NeatInterpolation (trimming)
 import Network.Wreq (params)
 import Slack.Channel
@@ -190,7 +190,7 @@ spec = do
       countRef <- newIORef 0
       program
         & runWithExpectations \case
-          GetPaginated _ _ -> readIORef countRef >>= writeIORef countRef . (+ 1)
+          GetPaginated _ _ -> modifyIORef countRef (+ 1)
           _ -> expectationFailure "Expected a GetPaginated query"
       count <- readIORef countRef
       count `shouldBe` 1

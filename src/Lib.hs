@@ -25,7 +25,7 @@ import Data.List ((\\))
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Text (Text, pack, unlines)
+import Data.Text (Text, filter, pack, unlines)
 import Data.Time.Clock (UTCTime)
 import IO (Env, Time, runEnv, runTime)
 import qualified IO as Time (getCurrent)
@@ -38,8 +38,8 @@ import Slack.Channel as Channel
     id,
     runChannels,
   )
-import qualified Slack.Channel as Channels (create, find)
-import qualified Slack.Channel as Channel (Effects)
+import qualified Slack.Channel as Channel (Effects, topic)
+import qualified Slack.Channel as Channels (create, find, setTopic)
 import Slack.Group as Group
   ( Groups,
     channelIDs,
@@ -179,30 +179,16 @@ applyEffect getDisplayName members = \case
     where
       createNew = Groups.create handle name
       same a b = null (a \\ b) && null (b \\ a)
-  _ -> return ()
-
--- channel <- findOrCreateChannel findChannel $ teamChannelName desiredTeamState
--- ensureChannelTopic getDisplayName channel desiredTeamState
--- let channelID = channel ^. Channel.id
--- traverse_ (ensureGroupState [channelID]) $ groupList desiredTeamState
-
--- ensureChannelTopic ::
---   ( Member (Error Text) r,
---     Member Channels r
---   ) =>
---   GetDisplayName ->
---   Channel ->
---   DesiredTeamState ->
---   Sem r ()
--- ensureChannelTopic getDisplayName channel desiredTeamState = do
---   newTopic <- topicGivenDisplayNames desiredTeamState (unGetDisplayName getDisplayName)
---   unless (same currentTopic newTopic) $ Channels.setTopic channelID newTopic
---   where
---     channelID = channel ^. Channel.id
---     currentTopic = channel ^. Channel.topic
---     same oldTopic newTopic = oldTopic == newTopic || clean oldTopic == clean newTopic
---     clean = filter (not . potentialAddedChar)
---     potentialAddedChar c = c `elem` ['<', '>']
+  SetSlackChannelTopic {name, topic} -> do
+    channel <- findOrCreateChannel name
+    newTopic <- topic <$> traverse (unGetDisplayName getDisplayName) (Set.toList members)
+    unless
+      (same (channel ^. Channel.topic) newTopic)
+      (Channels.setTopic (channel ^. Channel.id) newTopic)
+    where
+      same oldTopic newTopic = oldTopic == newTopic || clean oldTopic == clean newTopic
+      clean = filter (not . potentialAddedChar)
+      potentialAddedChar c = c `elem` ['<', '>']
 
 findOrCreateChannel ::
   Member Channels r =>

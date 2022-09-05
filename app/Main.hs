@@ -1,6 +1,8 @@
 module Main where
 
+import Control.Category ((>>>))
 import Control.Monad ((>=>))
+import Data.Functor (($>))
 import Data.List (intercalate, isPrefixOf, partition)
 import Data.Text (Text)
 import Data.Text.IO (getContents, readFile)
@@ -24,9 +26,9 @@ parse args
 parse ("ensure" : rest)
   | elem "-D" flags
       || elem "--dry-run" flags =
-    (run . dryRunEnsure) =<< readInput input
+    (runWithOutput . dryRunEnsure) =<< readInput input
   | not (null flags) = printFlags >> usage >> exitFailure
-  | otherwise = (run . ensure) =<< readInput input
+  | otherwise = (runWithoutOutput . ensure) =<< readInput input
   where
     printFlags = putStrLn ("Unknown flags: " <> intercalate "," flags)
     (flags, input) = partition ("-" `isPrefixOf`) rest
@@ -35,7 +37,7 @@ parse args
   where
     flags = filter ("-" `isPrefixOf`) args
     printFlags = putStrLn ("Unknown flags: " <> intercalate "," flags)
-parse ["list-users"] = run listUsers
+parse ["list-users"] = runWithOutput listUsers
 parse _ = usage >> exitFailure
 
 usage :: IO ()
@@ -45,13 +47,24 @@ usage =
     \                             ensure [file ..]\n\
     \                             ensure --dry-run [file ..]\n"
 
-run :: Sem Lib.CanonicalEffects Text -> IO ()
-run = runCanonical >=> logResult
+runWithoutOutput :: Sem Lib.CanonicalEffects () -> IO ()
+runWithoutOutput =
+  runCanonical
+    >>> ($>> "Program completed successfully! Exiting.")
+    >=> outputResultAndExit
 
-logResult :: Either Text Text -> IO ()
-logResult (Left message) = TIO.putStrLn message >> exitFailure
-logResult (Right message) = TIO.putStrLn message >> exitSuccess
+runWithOutput :: Sem Lib.CanonicalEffects Text -> IO ()
+runWithOutput = runCanonical >=> outputResultAndExit
+
+outputResultAndExit :: Either Text Text -> IO ()
+outputResultAndExit (Left errorMessage) = TIO.putStrLn ("Failed with error: " <> errorMessage) >> exitFailure
+outputResultAndExit (Right result) = TIO.putStrLn result >> exitSuccess
 
 readInput :: [String] -> IO Text
 readInput [] = getContents
 readInput fs = mconcat <$> traverse readFile fs
+
+infixl 4 $>>
+
+($>>) :: (Functor f, Functor g) => f (g a) -> b -> f (g b)
+fa $>> b = ($> b) <$> fa

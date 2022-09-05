@@ -91,7 +91,7 @@ type CanonicalEffects =
           Final IO
         ]
 
-runCanonical :: Sem CanonicalEffects Text -> IO (Either Text Text)
+runCanonical :: Sem CanonicalEffects a -> IO (Either Text a)
 runCanonical =
   runTime
     >>> runConfig
@@ -116,18 +116,15 @@ ensure ::
     Member Log r
   ) =>
   Text ->
-  Sem r Text
+  Sem r ()
 ensure inputText = do
   Log.info "Parsing configuration .."
   confList <- Config.parse inputText
   Log.info "Resolving current time .."
   time <- Time.getCurrent
   Log.info "Applying all configurations .."
-  teamResults <- traverse (wrapTeamResult $ applyConf time) confList
+  traverse_ (applyConf time) confList
   Log.info "Completed applying all configurations"
-  return $ unlines teamResults
-  where
-    wrapTeamResult f record = "Team MOCK: success!" <$ f record
 
 dryRunEnsure ::
   ( Member Config r,

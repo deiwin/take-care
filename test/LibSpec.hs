@@ -246,7 +246,7 @@ spec = do
                               }
                           )
                         ],
-                      "Team design: success!\n"
+                      ()
                     )
                   )
               )
@@ -313,7 +313,7 @@ spec = do
                             }
                         )
                       ],
-                    "Team MOCK: success!\n"
+                    ()
                   )
                 )
           )

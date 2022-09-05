@@ -2,11 +2,12 @@
 
 module LibSpec (spec) where
 
-import Control.Lens ((^.))
 import Config (Conf (..), Config (..), Effect (..), Rotation (..))
 import Control.Arrow (first, second)
 import Control.Category ((>>>))
+import Control.Lens ((^.))
 import Data.Function ((&))
+import Data.List (find)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (Text, intercalate)
@@ -18,6 +19,8 @@ import NeatInterpolation (trimming)
 import Polysemy (InterpreterFor, Member, Sem, interpret, run)
 import qualified Polysemy as P (Members)
 import Polysemy.Error (Error, note, runError, throw)
+import Polysemy.Log (Log, LogMessage (..), Severity (..), interpretLogNull, interpretLogOutput)
+import Polysemy.Output (Output, runOutputList)
 import Polysemy.State (State, get, modify, put, runState)
 import Slack.Channel (Channel (..), Channels (..))
 import qualified Slack.Channel as C (Channels (Create, Find))
@@ -25,7 +28,6 @@ import Slack.Group (Group (..), Groups (..))
 import qualified Slack.Group as G (Groups (Create, Find))
 import Slack.User (User (..), Users (..))
 import qualified Slack.User as U (Users (Find, ListAll), id)
-import Data.List (find)
 import Test.Hspec
   ( Spec,
     describe,
@@ -39,8 +41,15 @@ spec = do
     it "returns an empty string for an empty list of users" $ do
       listUsers
         & runListUsersConst []
+        & runLogToList
         & run
-        & (`shouldBe` "")
+        & ( `shouldBe`
+              ( [ LogMessage Info "Fetching all users ..",
+                  LogMessage Info "Finished fetching all users"
+                ],
+                ""
+              )
+          )
 
     it "pretty prints the user IDs and display names" $ do
       listUsers
@@ -48,10 +57,15 @@ spec = do
           [ User {_id = "id1", _displayName = "@name1"},
             User {_id = "id2", _displayName = "@name2"}
           ]
+        & runLogToList
         & run
         & ( `shouldBe`
-              "id1: @name1\n\
-              \id2: @name2\n"
+              ( [ LogMessage Info "Fetching all users ..",
+                  LogMessage Info "Finished fetching all users"
+                ],
+                "id1: @name1\n\
+                \id2: @name2\n"
+              )
           )
 
   describe "dryRunEnsure" $ do
@@ -77,8 +91,17 @@ spec = do
         & runTimeConst time
         & runListUsersConst []
         & runError
+        & runLogToList
         & run
-        & (`shouldBe` Left "Could not find user with ID: user_id")
+        & ( `shouldBe`
+              ( [ LogMessage Info "Parsing configuration ..",
+                  LogMessage Info "Resolving current time ..",
+                  LogMessage Info "Resolving rotation effects ..",
+                  LogMessage Info "Showing resolved rotation effects .."
+                ],
+                Left "Could not find user with ID: user_id"
+              )
+          )
 
     it "returns the pretty-printed output of changes to be made" $ do
       time <- iso8601ParseM "2021-10-10T00:00:00Z"
@@ -116,17 +139,24 @@ spec = do
             User {_id = "caroline", _displayName = "Caroline"}
           ]
         & runError
+        & runLogToList
         & run
         & ( `shouldBe`
-              Right
-                [trimming|
-                  For Alice:
-                    SetSlackGroup: @team-caretaker {name = "Team team caretaker(s)", channels = []}
-                    SetSlackChannelTopic #tm-team: topic
+              ( [ LogMessage Info "Parsing configuration ..",
+                  LogMessage Info "Resolving current time ..",
+                  LogMessage Info "Resolving rotation effects ..",
+                  LogMessage Info "Showing resolved rotation effects .."
+                ],
+                Right
+                  [trimming|
+                    For Alice:
+                      SetSlackGroup: @team-caretaker {name = "Team team caretaker(s)", channels = []}
+                      SetSlackChannelTopic #tm-team: topic
 
-                  For Alice, Bob, Caroline:
-                    SetSlackGroup: @team-team {name = "Team team", channels = ["tm-team"]}
-                |]
+                    For Alice, Bob, Caroline:
+                      SetSlackGroup: @team-team {name = "Team team", channels = ["tm-team"]}
+                  |]
+              )
           )
 
   describe "ensure" $ do
@@ -168,43 +198,58 @@ spec = do
         & runChannels Map.empty
         & runGroups Map.empty
         & runError
+        & runLogToList
         & run
         & ( `shouldBe`
-              Right
-                ( Map.fromList
-                    [ ( "id_design-caretaker",
-                        ( Group
-                            { _id = "id_design-caretaker",
-                              _handle = "design-caretaker",
-                              _name = "Team design caretaker(s)",
-                              _channelIDs = []
-                            },
-                          ["alice"]
-                        )
-                      ),
-                      ( "id_design-team",
-                        ( Group
-                            { _id = "id_design-team",
-                              _handle = "design-team",
-                              _name = "Team design",
-                              _channelIDs = ["id_tm-design"]
-                            },
-                          ["alice", "bob", "caroline"]
-                        )
-                      )
-                    ],
+              ( [ LogMessage Info "Parsing configuration ..",
+                  LogMessage Info "Resolving current time ..",
+                  LogMessage Info "Applying all configurations ..",
+                  LogMessage Info "Applying all effects for a rotation ..",
+                  LogMessage Info "Applying to member IDs fromList [\"alice\"] the effect SetSlackGroup {handle = \"design-caretaker\", name = \"Team design caretaker(s)\", channels = []} ..",
+                  LogMessage Info "Finished applying effect SetSlackGroup {handle = \"design-caretaker\", name = \"Team design caretaker(s)\", channels = []}",
+                  LogMessage Info "Applying to member IDs fromList [\"alice\"] the effect SetSlackChannelTopic {name = \"tm-design\", topic = \"Caretaker is: input 1, input 2, ..\"} ..",
+                  LogMessage Info "Finished applying effect SetSlackChannelTopic {name = \"tm-design\", topic = \"Caretaker is: input 1, input 2, ..\"}",
+                  LogMessage Info "Applying all effects for a rotation ..",
+                  LogMessage Info "Applying to member IDs fromList [\"alice\",\"bob\",\"caroline\"] the effect SetSlackGroup {handle = \"design-team\", name = \"Team design\", channels = [\"tm-design\"]} ..",
+                  LogMessage Info "Finished applying effect SetSlackGroup {handle = \"design-team\", name = \"Team design\", channels = [\"tm-design\"]}",
+                  LogMessage Info "Completed applying all configurations"
+                ],
+                Right
                   ( Map.fromList
-                      [ ( "id_tm-design",
-                          Channel
-                            { _id = "id_tm-design",
-                              _name = "tm-design",
-                              _topic = "Caretaker is: Alice"
-                            }
+                      [ ( "id_design-caretaker",
+                          ( Group
+                              { _id = "id_design-caretaker",
+                                _handle = "design-caretaker",
+                                _name = "Team design caretaker(s)",
+                                _channelIDs = []
+                              },
+                            ["alice"]
+                          )
+                        ),
+                        ( "id_design-team",
+                          ( Group
+                              { _id = "id_design-team",
+                                _handle = "design-team",
+                                _name = "Team design",
+                                _channelIDs = ["id_tm-design"]
+                              },
+                            ["alice", "bob", "caroline"]
+                          )
                         )
                       ],
-                    "Team design: success!\n"
+                    ( Map.fromList
+                        [ ( "id_tm-design",
+                            Channel
+                              { _id = "id_tm-design",
+                                _name = "tm-design",
+                                _topic = "Caretaker is: Alice"
+                              }
+                          )
+                        ],
+                      "Team design: success!\n"
+                    )
                   )
-                )
+              )
           )
 
     it "does not try to create the same channel twice" $ do
@@ -218,8 +263,8 @@ spec = do
                       { handle = "group-handle",
                         name = "group-name",
                         channels = ["channel-name"]
-                      }
-                  , SetSlackGroup
+                      },
+                    SetSlackGroup
                       { handle = "second-group-handle",
                         name = "second-group-name",
                         channels = ["channel-name"]
@@ -229,10 +274,11 @@ spec = do
           ]
         & runTimeConst time
         & runListUsersConst
-          [ User {_id = "user-name", _displayName = "user-display-name"} ]
+          [User {_id = "user-name", _displayName = "user-display-name"}]
         & runChannels Map.empty
         & runGroups Map.empty
         & runError
+        & interpretLogNull
         & run
         & ( `shouldBe`
               Right
@@ -359,3 +405,6 @@ runListUsersConst :: [User] -> InterpreterFor Users r
 runListUsersConst users = interpret \case
   U.Find idToFind -> return $ find ((== idToFind) . (^. U.id)) users
   U.ListAll -> return users
+
+runLogToList :: Sem (Log ': Output LogMessage ': r) a -> Sem r ([LogMessage], a)
+runLogToList = runOutputList . interpretLogOutput

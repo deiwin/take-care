@@ -2,6 +2,10 @@
 
 ## Unreleased changes
 
+* Added logging. The program now outputs logs to stderr. Users who were
+  previously using the programs entire output (stdout + stderr), should now
+  distinguish between stdout and stderr.
+
 ## v0.5.0
 
 * Change `list-caretakers` command to be `ensure --dry-run` instead. Also

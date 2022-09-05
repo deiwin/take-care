@@ -28,6 +28,10 @@ import Data.Text (Text, filter, pack, unlines)
 import Data.Time.Clock (UTCTime)
 import IO (Env, Time, runEnv, runTime)
 import qualified IO as Time (getCurrent)
+import Log (runLog)
+import qualified Log as Log' (Effects)
+import Polysemy.Log (Log)
+import qualified Polysemy.Log as Log (info)
 import Polysemy (Embed, Final, Member, Members, Sem, embedToFinal, runFinal)
 import Polysemy.Error (Error, errorToIOFinal, note)
 import Polysemy.Input (Input)
@@ -80,8 +84,10 @@ type CanonicalEffects =
           Slack,
           Input NetCtx,
           Env,
-          Error Text,
-          Embed IO,
+          Error Text
+        ]
+    ++ Log'.Effects
+    ++ '[ Embed IO,
           Final IO
         ]
 
@@ -96,6 +102,7 @@ runCanonical =
     >>> runNetCtx
     >>> runEnv
     >>> errorToIOFinal
+    >>> runLog
     >>> embedToFinal @IO
     >>> runFinal @IO
 
@@ -105,14 +112,19 @@ ensure ::
     Member (Error Text) r,
     Member Channels r,
     Member Users r,
-    Member Groups r
+    Member Groups r,
+    Member Log r
   ) =>
   Text ->
   Sem r Text
 ensure inputText = do
+  Log.info "Parsing configuration .."
   confList <- Config.parse inputText
+  Log.info "Resolving current time .."
   time <- Time.getCurrent
+  Log.info "Applying all configurations .."
   teamResults <- traverse (wrapTeamResult $ applyConf time) confList
+  Log.info "Completed applying all configurations"
   return $ unlines teamResults
   where
     wrapTeamResult f record = "Team MOCK: success!" <$ f record
@@ -121,18 +133,27 @@ dryRunEnsure ::
   ( Member Config r,
     Member Time r,
     Member (Error Text) r,
-    Member Users r
+    Member Users r,
+    Member Log r
   ) =>
   Text ->
   Sem r Text
 dryRunEnsure inputText = do
+  Log.info "Parsing configuration .."
+  confList <- Config.parse inputText
+  Log.info "Resolving current time .."
   time <- Time.getCurrent
-  resolvedRotationEffectsList <- currentResolvedRotationEffects time <<$>> Config.parse inputText
+  Log.info "Resolving rotation effects .."
+  let resolvedRotationEffectsList = currentResolvedRotationEffects time <$> confList
+  Log.info "Showing resolved rotation effects .."
   showResolvedRotationEffectsList getDisplayName resolvedRotationEffectsList
 
-listUsers :: Member Users r => Sem r Text
+listUsers :: Members '[Users, Log] r => Sem r Text
 listUsers = do
-  unlines . fmap formatLine <$> Users.listAll
+  Log.info "Fetching all users .."
+  users <- Users.listAll
+  Log.info "Finished fetching all users"
+  return (unlines (formatLine <$> users))
   where
     formatLine user = pack $ printf "%s: %s" (user ^. User.id) (user ^. displayName)
 
@@ -140,25 +161,28 @@ applyConf ::
   ( Member (Error Text) r,
     Member Channels r,
     Member Users r,
-    Member Groups r
+    Member Groups r,
+    Member Log r
   ) =>
   UTCTime ->
   Conf ->
   Sem r ()
 applyConf time conf = do
   let (members, effects) = currentResolvedRotationEffects time conf
+  Log.info "Applying all effects for a rotation .."
   traverse_ (applyEffect members) effects
 
 applyEffect ::
   ( Member (Error Text) r,
     Member Groups r,
     Member Channels r,
-    Member Users r
+    Member Users r,
+    Member Log r
   ) =>
   Set Text ->
   Effect ->
   Sem r ()
-applyEffect members = \case
+applyEffect members = withLog \case
   SetSlackGroup {handle, name, channels} -> do
     existingGroup <- Groups.find handle
     defaultChannelIDs <- (^. Channel.id) <<$>> traverse findOrCreateChannel channels
@@ -183,6 +207,17 @@ applyEffect members = \case
       same oldTopic newTopic = oldTopic == newTopic || clean oldTopic == clean newTopic
       clean = filter (not . potentialAddedChar)
       potentialAddedChar c = c `elem` ['<', '>']
+  where
+    withLog ::
+      Member Log r =>
+      (Effect -> Sem r a) ->
+      Effect ->
+      Sem r a
+    withLog f effect = do
+      Log.info (pack (printf "Applying to member IDs %s the effect %s .." (show members) (show effect)))
+      result <- f effect
+      Log.info (pack (printf "Finished applying effect %s" (show effect)))
+      return result
 
 getDisplayName :: Members '[Users, Error Text] r => Text -> Sem r Text
 getDisplayName id =

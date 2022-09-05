@@ -150,7 +150,7 @@ listUsers = do
   Log.info "Fetching all users .."
   users <- Users.listAll
   Log.info "Finished fetching all users"
-  return (unlines (formatLine <$> users))
+  return $ unlines (formatLine <$> users)
   where
     formatLine user = pack $ printf "%s: %s" (user ^. User.id) (user ^. displayName)
 

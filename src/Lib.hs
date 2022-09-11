@@ -30,11 +30,11 @@ import IO (Env, Time, runEnv, runTime)
 import qualified IO as Time (getCurrent)
 import Log (runLog)
 import qualified Log as Log' (Effects)
-import Polysemy.Log (Log)
-import qualified Polysemy.Log as Log (info)
 import Polysemy (Embed, Final, Member, Members, Sem, embedToFinal, runFinal)
 import Polysemy.Error (Error, errorToIOFinal, note)
 import Polysemy.Input (Input)
+import Polysemy.Log (Log)
+import qualified Polysemy.Log as Log (info)
 import Slack.Channel as Channel
   ( Channel,
     Channels,
@@ -181,22 +181,30 @@ applyEffect ::
   Sem r ()
 applyEffect members = withLog \case
   SetSlackGroup {handle, name, channels} -> do
+    Log.info (pack (printf "Finding or creating the following channels: %s .." (show channels)))
     existingGroup <- Groups.find handle
     defaultChannelIDs <- (^. Channel.id) <<$>> traverse findOrCreateChannel channels
+
+    Log.info (pack (printf "Finding or creating the group @%s .." handle))
     slackGroup <- maybe (createNew defaultChannelIDs) return existingGroup
     let groupID = slackGroup ^. Group.id
 
     currentMembers <- Set.fromList <$> Groups.getMembers groupID
+    Log.info (pack (printf "Updating group members if changed from %s to %s .." (show currentMembers) (show members)))
     unless (members == currentMembers) $ Groups.setMembers groupID $ Set.toList members
 
     let currentChannels = slackGroup ^. channelIDs
+    Log.info (pack (printf "Updating default channel IDs if changed from %s to %s .." (show currentChannels) (show defaultChannelIDs)))
     unless (same defaultChannelIDs currentChannels) $ Groups.setChannels groupID defaultChannelIDs
     where
       createNew = Groups.create handle name
       same a b = null (a \\ b) && null (b \\ a)
   SetSlackChannelTopic {name, topic} -> do
+    Log.info (pack (printf "Finding or creating channel #%s .." name))
     channel <- findOrCreateChannel name
+
     newTopic <- topic <$> traverse getDisplayName (Set.toList members)
+    Log.info (pack (printf "Updating topic if changed from \"%s\" to \"%s\" .." (channel ^. Channel.topic) newTopic))
     unless
       (same (channel ^. Channel.topic) newTopic)
       (Channels.setTopic (channel ^. Channel.id) newTopic)

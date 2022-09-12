@@ -5,6 +5,7 @@ module Slack.GroupSpec (spec) where
 import Control.Lens ((&), (^.))
 import NeatInterpolation (trimming)
 import Network.Wreq (params)
+import Polysemy.Log (LogMessage (..), Severity (..))
 import Slack.Group
   ( Group (..),
     Groups,
@@ -51,21 +52,25 @@ spec = do
     it "fails on a response of an empty object" $ do
       Groups.find "whatever"
         & runGetConst "{}"
+        & snd -- Ignore logs
         & (`shouldBe` Left "\"usergroups.list\" response didn't include a \"usergroups\" field")
 
     it "retuns Nothing if the list of groups is empty" $ do
       Groups.find "whatever"
         & runGetConst "{\"usergroups\": []}"
+        & snd -- Ignore logs
         & (`shouldBe` Right Nothing)
 
     it "fails if group object does not have an 'id' key" $ do
       Groups.find "whatever"
         & runGetConst "{\"usergroups\": [{}]}"
+        & snd -- Ignore logs
         & (`shouldBe` Left "key \"id\" not found")
 
     it "fails if group object does not have a 'handle' key" $ do
       Groups.find "whatever"
         & runGetConst "{\"usergroups\": [{\"id\": \"something\"}]}"
+        & snd -- Ignore logs
         & (`shouldBe` Left "key \"handle\" not found")
 
     it "fails if group object does not have a name key" $ do
@@ -79,6 +84,7 @@ spec = do
             }]
           }
           |]
+        & snd -- Ignore logs
         & (`shouldBe` Left "key \"name\" not found")
 
     it "fails if group object does not have a 'prefs' key" $ do
@@ -93,6 +99,7 @@ spec = do
             }]
           }
           |]
+        & snd -- Ignore logs
         & (`shouldBe` Left "key \"prefs\" not found")
 
     it "fails if 'prefs' key is not an object" $ do
@@ -108,6 +115,7 @@ spec = do
             }]
           }
           |]
+        & snd -- Ignore logs
         & (`shouldBe` Left "parsing KeyMap failed, expected Object, but encountered String")
 
     it "fails if prefs object does not have a 'channels' key" $ do
@@ -123,6 +131,7 @@ spec = do
             }]
           }
           |]
+        & snd -- Ignore logs
         & (`shouldBe` Left "key \"channels\" not found")
 
     it "returns Nothing if the group handle doesn't match the query" $ do
@@ -140,6 +149,7 @@ spec = do
             }]
           }
           |]
+        & snd -- Ignore logs
         & (`shouldBe` Right Nothing)
 
     it "returns the group object if handle is a match" $ do
@@ -158,16 +168,18 @@ spec = do
           }
           |]
         & ( `shouldBe`
-              Right
-                ( Just
-                    ( Group
-                        { _id = "group_id",
-                          _handle = "group_handle",
-                          _name = "group_name",
-                          _channelIDs = ["channel_id1", "channel_id2"]
-                        }
-                    )
-                )
+              ( [LogMessage Info "Finding group by handle @group_handle .."],
+                Right
+                  ( Just
+                      ( Group
+                          { _id = "group_id",
+                            _handle = "group_handle",
+                            _name = "group_name",
+                            _channelIDs = ["channel_id1", "channel_id2"]
+                          }
+                      )
+                  )
+              )
           )
 
   describe "getMembers" $ do
@@ -199,7 +211,11 @@ spec = do
             "users": ["user1", "user2"]
           }
           |]
-        & (`shouldBe` Right ["user1", "user2"])
+        & ( `shouldBe`
+              ( [LogMessage Info "Getting members of group with ID whatever .."],
+                Right ["user1", "user2"]
+              )
+          )
 
   describe "setMembers" $ do
     it "queries usergroups.users.update" $ do
@@ -223,7 +239,11 @@ spec = do
     it "ignores response body" $ do
       Groups.setMembers "group_id" ["alice", "bob"]
         & runPostConst "{\"whatever\": {}}"
-        & (`shouldBe` Right ())
+        & ( `shouldBe`
+              ( [LogMessage Info "Setting members of group with ID group_id to user IDs [\"alice\",\"bob\"] .."],
+                Right ()
+              )
+          )
 
   describe "setChannels" $ do
     it "queries usergroups.update" $ do
@@ -247,7 +267,11 @@ spec = do
     it "ignores response body" $ do
       Groups.setChannels "group_id" ["channel1", "channel2"]
         & runPostConst "{\"whatever\": {}}"
-        & (`shouldBe` Right ())
+        & ( `shouldBe`
+              ( [LogMessage Info "Setting channels of group with ID group_id to channel IDs [\"channel1\",\"channel2\"] .."],
+                Right ()
+              )
+          )
 
   describe "create" $ do
     it "queries usergroups.create" $ do
@@ -277,6 +301,7 @@ spec = do
     it "fails on a response of an empty object" $ do
       Groups.create "group_handle" "Group Name" ["channel1", "channel2"]
         & runPostConst "{}"
+        & snd -- Ignore logs
         & (`shouldBe` Left "\"usergroups.create\" response didn't include a \"usergroup\" key")
 
     it "returns the created group object" $ do
@@ -295,14 +320,16 @@ spec = do
           }
           |]
         & ( `shouldBe`
-              Right
-                ( Group
-                    { _id = "group_id",
-                      _handle = "group_handle",
-                      _name = "group_name",
-                      _channelIDs = ["channel1", "channel2"]
-                    }
-                )
+              ( [LogMessage Info "Creating a group with handle @group_handle .."],
+                Right
+                  ( Group
+                      { _id = "group_id",
+                        _handle = "group_handle",
+                        _name = "group_name",
+                        _channelIDs = ["channel1", "channel2"]
+                      }
+                  )
+              )
           )
 
 runWithExpectations = runSlackWithExpectations @'[Groups] runGroups

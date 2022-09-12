@@ -17,14 +17,18 @@ import Data.Aeson.Lens (key, values)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
+import Data.Text (pack)
 import Data.Text as T (Text, null)
 import GHC.Generics (Generic)
 import Network.Wreq (defaults)
 import Polysemy (InterpreterFor, InterpretersFor, Members, Sem, interpret, makeSem)
 import Polysemy.Error (Error, note)
+import Polysemy.Log (Log)
+import qualified Polysemy.Log as Log (info)
 import Polysemy.State (State, evalState, get, put)
 import Slack.Util (Slack, fromJSON)
 import qualified Slack.Util as Slack (getPaginated)
+import Text.Printf (printf)
 import Prelude hiding (id)
 
 data User = User
@@ -62,19 +66,26 @@ type Effects =
      State UsersStore
    ]
 
-runUsers :: Members '[Slack, Error Text] r => InterpretersFor Effects r
+runUsers :: Members '[Slack, Error Text, Log] r => InterpretersFor Effects r
 runUsers = evalState (False, Map.empty) . interpretWithCache
   where
-    interpretWithCache :: Members '[Slack, Error Text, State UsersStore] r => InterpreterFor Users r
+    interpretWithCache :: Members '[Slack, Error Text, State UsersStore, Log] r => InterpreterFor Users r
     interpretWithCache = interpret \case
-      ListAll -> fmap snd . Map.toList <$> getAllThroughCache
-      Find id -> Map.lookup id <$> getAllThroughCache
-    getAllThroughCache :: Members '[Slack, Error Text, State UsersStore] r => Sem r (Map ID User)
+      ListAll -> do
+        Log.info "Listing all users .."
+        fmap snd . Map.toList <$> getAllThroughCache
+      Find id -> do
+        Log.info (pack (printf "Finding user with ID %s .." id))
+        Map.lookup id <$> getAllThroughCache
+    getAllThroughCache :: Members '[Slack, Error Text, State UsersStore, Log] r => Sem r (Map ID User)
     getAllThroughCache = do
       (alreadyRanListAll, map) <- get
       if alreadyRanListAll
-        then return map
+        then do
+          Log.info "Using cached user map .."
+          return map
         else do
+          Log.info "Building user cache .."
           users <- listAllUsers
           let newMap = Map.fromList ((\u -> (u ^. id, u)) <$> users)
           put (True, newMap)

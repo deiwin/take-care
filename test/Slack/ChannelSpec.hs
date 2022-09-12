@@ -6,6 +6,7 @@ import Control.Lens ((&), (^.))
 import Data.IORef (modifyIORef, newIORef, readIORef)
 import NeatInterpolation (trimming)
 import Network.Wreq (params)
+import Polysemy.Log (LogMessage (..), Severity (..))
 import Slack.Channel
   ( Channel (..),
     Effects,
@@ -24,6 +25,7 @@ import Test.Hspec
     describe,
     expectationFailure,
     it,
+    context,
     shouldBe,
     shouldContain,
   )
@@ -58,21 +60,25 @@ spec = do
     it "fails on a response of an empty object" $ do
       Channels.find "name"
         & runGetPaginatedConst ["{}"]
+        & snd -- Ignore logs
         & (`shouldBe` Left "\"conversations.list\" response didn't include a \"channels\" field")
 
     it "retuns Nothing if the list of channels is empty" $ do
       Channels.find "name"
         & runGetPaginatedConst ["{\"channels\": []}"]
+        & snd -- Ignore logs
         & (`shouldBe` Right Nothing)
 
     it "fails if channel object does not have an 'id' key" $ do
       Channels.find "name"
         & runGetPaginatedConst ["{\"channels\": [{}]}"]
+        & snd -- Ignore logs
         & (`shouldBe` Left "key \"id\" not found")
 
     it "fails if channel object does not have a 'name' key" $ do
       Channels.find "name"
         & runGetPaginatedConst ["{\"channels\": [{\"id\": \"something\"}]}"]
+        & snd -- Ignore logs
         & (`shouldBe` Left "key \"name\" not found")
 
     it "fails if channel object does not have a 'topic' key" $ do
@@ -87,6 +93,7 @@ spec = do
             }
             |]
           ]
+        & snd -- Ignore logs
         & (`shouldBe` Left "key \"topic\" not found")
 
     it "fails if 'topic' key is not an object" $ do
@@ -102,6 +109,7 @@ spec = do
             }
           |]
           ]
+        & snd -- Ignore logs
         & (`shouldBe` Left "parsing KeyMap failed, expected Object, but encountered String")
 
     it "fails if topic object does not have a 'value' key" $ do
@@ -117,6 +125,7 @@ spec = do
             }
           |]
           ]
+        & snd -- Ignore logs
         & (`shouldBe` Left "key \"value\" not found")
 
     it "returns nothing if the channels in the response don't match the name" $ do
@@ -134,6 +143,7 @@ spec = do
             }
           |]
           ]
+        & snd -- Ignore logs
         & (`shouldBe` Right Nothing)
 
     it "finds channel with a matching name" $ do
@@ -151,7 +161,14 @@ spec = do
             }
           |]
           ]
-        & (`shouldBe` Right (Just Channel {_id = "id", _name = "name", _topic = "topic"}))
+        & ( `shouldBe`
+              ( [ LogMessage Info "Finding channel #name ..",
+                  LogMessage Info "Building channel cache before finding channel #name ..",
+                  LogMessage Info "Finished building channel cache. Finding channel #name .."
+                ],
+                Right (Just Channel {_id = "id", _name = "name", _topic = "topic"})
+              )
+          )
 
     it "finds channel with a matching name on the second page" $ do
       Channels.find "page2_channel"
@@ -179,21 +196,44 @@ spec = do
               }
             |]
           ]
+        & snd -- Ignore logs
         & (`shouldBe` Right (Just Channel {_id = "id2", _name = "page2_channel", _topic = "topic2"}))
 
-    it "only calls conversations.list once for multiple find calls" $ do
-      let program =
-            do
-              first <- Channels.find "first"
-              second <- Channels.find "second"
-              return (first, second)
-      countRef <- newIORef 0
-      program
-        & runWithExpectations \case
-          GetPaginated _ _ -> modifyIORef countRef (+ 1)
-          _ -> expectationFailure "Expected a GetPaginated query"
-      count <- readIORef countRef
-      count `shouldBe` 1
+    context "for a program with multiple find invocations" $ do
+      it "only calls conversations.list once" $ do
+        let program =
+              do
+                first <- Channels.find "first"
+                second <- Channels.find "second"
+                return (first, second)
+
+        countRef <- newIORef 0
+        program
+          & runWithExpectations \case
+            GetPaginated _ _ -> modifyIORef countRef (+ 1)
+            _ -> expectationFailure "Expected a GetPaginated query"
+        count <- readIORef countRef
+        count `shouldBe` 1
+
+      it "logs the building and usage of the cache" $ do
+        let program =
+              do
+                first <- Channels.find "first"
+                second <- Channels.find "second"
+                return (first, second)
+
+        program
+          & runGetPaginatedConst []
+          & ( `shouldBe`
+                ( [ LogMessage Info "Finding channel #first ..",
+                    LogMessage Info "Building channel cache before finding channel #first ..",
+                    LogMessage Info "Finished building channel cache. Finding channel #first ..",
+                    LogMessage Info "Finding channel #second ..",
+                    LogMessage Info "Using channel cache to find channel #second .."
+                  ],
+                  Right (Nothing, Nothing)
+                )
+            )
 
   describe "create" $ do
     it "posts to conversations.create" $ do
@@ -211,11 +251,13 @@ spec = do
     it "fails on a response of an empty object" $ do
       Channels.create "whatever"
         & runPostConst "{}"
+        & snd -- Ignore logs
         & (`shouldBe` Left "\"conversations.create\" response didn't include a \"channel\" key")
 
     it "fails if channel object does not have an 'id' key" $ do
       Channels.create "whatever"
         & runPostConst "{\"channel\": {}}"
+        & snd -- Ignore logs
         & (`shouldBe` Left "key \"id\" not found")
 
     it "returns the Channel object" $ do
@@ -232,7 +274,13 @@ spec = do
               }
             }
           |]
-        & (`shouldBe` Right (Channel {_id = "id", _name = "name", _topic = "topic"}))
+        & ( `shouldBe`
+              ( [ LogMessage Info "Creating channel #name ..",
+                  LogMessage Info "Finished creating #name. Updating channel cache .."
+                ],
+                Right (Channel {_id = "id", _name = "name", _topic = "topic"})
+              )
+          )
 
   describe "setTopic" $ do
     it "posts to conversations.setTopic" $ do
@@ -256,7 +304,13 @@ spec = do
     it "ignores response body" $ do
       Channels.setTopic "channel_id" "topic_message"
         & runPostConst "{\"whatever\": {}}"
-        & (`shouldBe` Right ())
+        & ( `shouldBe`
+              ( [ LogMessage Info "Setting channel (ID: channel_id) topic to: topic_message ..",
+                  LogMessage Info "Finished setting channel (ID: channel_id) topic. Updating channel cache .."
+                ],
+                Right ()
+              )
+          )
 
 runWithExpectations = runSlackWithExpectations @Effects runChannels
 

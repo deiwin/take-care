@@ -18,14 +18,17 @@ import Data.Aeson (FromJSON (parseJSON), withObject, (.:), (.=))
 import Data.Aeson.Lens (key, values)
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Text (Text)
+import Data.Text (Text, pack)
 import GHC.Generics (Generic)
 import Network.Wreq (defaults, param)
 import Polysemy (InterpreterFor, InterpretersFor, Member, Members, Sem, interpret, makeSem)
 import Polysemy.Error (Error, note)
+import Polysemy.Log (Log)
+import qualified Polysemy.Log as Log (info)
 import Polysemy.State (State, evalState, get, modify, put)
 import Slack.Util (Slack, fromJSON)
 import qualified Slack.Util as Slack (getPaginated, post)
+import Text.Printf (printf)
 import Prelude hiding (id)
 
 data Channel = Channel
@@ -63,28 +66,37 @@ type Effects =
      State ChannelStore
    ]
 
-runChannels :: Members '[Slack, Error Text] r => InterpretersFor Effects r
+runChannels :: Members '[Slack, Error Text, Log] r => InterpretersFor Effects r
 runChannels = evalState (False, Map.empty, Map.empty) . interpretWithCache
   where
-    interpretWithCache :: Members '[Slack, Error Text, State ChannelStore] r => InterpreterFor Channels r
+    interpretWithCache :: Members '[Slack, Error Text, State ChannelStore, Log] r => InterpreterFor Channels r
     interpretWithCache = interpret \case
       Create name -> do
+        Log.info (pack (printf "Creating channel #%s .." name))
         channel <- createChannel name
+        Log.info (pack (printf "Finished creating #%s. Updating channel cache .." name))
         modify $ second3 $ Map.insert name (channel ^. id)
         modify $ third3 $ Map.insert (channel ^. id) channel
         return channel
       SetTopic id newTopic -> do
+        Log.info (pack (printf "Setting channel (ID: %s) topic to: %s .." id newTopic))
         setChannelTopic id newTopic
+        Log.info (pack (printf "Finished setting channel (ID: %s) topic. Updating channel cache .." id))
         modify $ third3 $ Map.adjust (topic .~ newTopic) id
       Find nameToFind -> do
+        Log.info (pack (printf "Finding channel #%s .." nameToFind))
         (alreadyRanListAll, nameIx, map) <- get
         if alreadyRanListAll
-          then return $ findByName nameIx map nameToFind
+          then do
+            Log.info (pack (printf "Using channel cache to find channel #%s .." nameToFind))
+            return $ findByName nameIx map nameToFind
           else do
+            Log.info (pack (printf "Building channel cache before finding channel #%s .." nameToFind))
             channels <- listAllChannels
             let newNameIx = Map.union (Map.fromList ((\c -> (c ^. name, c ^. id)) <$> channels)) nameIx
             let newMap = Map.union (Map.fromList ((\c -> (c ^. id, c)) <$> channels)) map
             put (True, newNameIx, newMap)
+            Log.info (pack (printf "Finished building channel cache. Finding channel #%s .." nameToFind))
             return $ findByName newNameIx newMap nameToFind
         where
           findByName :: Map Name ID -> Map ID Channel -> Name -> Maybe Channel

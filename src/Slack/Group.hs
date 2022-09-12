@@ -20,13 +20,16 @@ import Data.Aeson (FromJSON (parseJSON), withObject, (.:), (.=))
 import Data.Aeson.Lens (key, values, _String)
 import Data.List (intercalate)
 import qualified Data.List as L (find)
-import Data.Text (Text, unpack)
+import Data.Text (Text, pack, unpack)
 import GHC.Generics (Generic)
 import Network.Wreq (defaults, param)
 import Polysemy (InterpreterFor, Member, Members, Sem, interpret, makeSem)
 import Polysemy.Error (Error, note)
+import Polysemy.Log (Log)
+import qualified Polysemy.Log as Log (info)
 import Slack.Util (Slack, fromJSON)
 import qualified Slack.Util as Slack (get, post)
+import Text.Printf (printf)
 import Prelude hiding (id)
 
 data Group = Group
@@ -57,13 +60,23 @@ data Groups m a where
 
 makeSem ''Groups
 
-runGroups :: Members '[Slack, Error Text] r => InterpreterFor Groups r
+runGroups :: Members '[Slack, Error Text, Log] r => InterpreterFor Groups r
 runGroups = interpret \case
-  GetMembers id -> getGroupMembers id
-  SetMembers groupID userIDs -> setGroupMembers groupID userIDs
-  SetChannels groupID defaultChannelIDs -> setGroupChannels groupID defaultChannelIDs
-  Find handle -> findGroup handle
-  Create handle name defaultChannelIDs -> createGroup handle name defaultChannelIDs
+  GetMembers id -> do
+    Log.info (pack (printf "Getting members of group with ID %s .." id))
+    getGroupMembers id
+  SetMembers groupID userIDs -> do
+    Log.info (pack (printf "Setting members of group with ID %s to user IDs %s .." groupID (show userIDs)))
+    setGroupMembers groupID userIDs
+  SetChannels groupID defaultChannelIDs -> do
+    Log.info (pack (printf "Setting channels of group with ID %s to channel IDs %s .." groupID (show defaultChannelIDs)))
+    setGroupChannels groupID defaultChannelIDs
+  Find handle -> do
+    Log.info (pack (printf "Finding group by handle @%s .." handle))
+    findGroup handle
+  Create handle name defaultChannelIDs -> do
+    Log.info (pack (printf "Creating a group with handle @%s .." handle))
+    createGroup handle name defaultChannelIDs
 
 getGroupMembers :: Member Slack r => Text -> Sem r [Text]
 getGroupMembers groupID = do

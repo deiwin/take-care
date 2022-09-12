@@ -19,29 +19,33 @@ import Data.Text.Encoding (encodeUtf8)
 import Polysemy (Embed, InterpreterFor, Member, Sem, embed, interpret, run, runM)
 import Polysemy.Error (Error, note, runError)
 import Polysemy.Internal (Append)
+import Polysemy.Log (Log, LogMessage, interpretLogNull, interpretLogOutput)
+import Polysemy.Output (Output, runOutputList)
 import Slack.Util (Slack (..))
 import Test.Hspec (Expectation)
 
 runSlackWith ::
-  (a -> Sem '[Slack, Error Text] b) ->
+  (a -> Sem '[Slack, Error Text, Log, Output LogMessage] b) ->
   SlackResponse ->
   a ->
-  Either Text b
+  ([LogMessage], Either Text b)
 runSlackWith runToSlack slackResponse =
   runToSlack
     >>> runSlack slackResponse
     >>> runError
+    >>> runLogToList
     >>> run
 
 runSlackWithExpectations ::
-  (Sem (Append slackEffs '[Slack, Error Text, Embed IO]) a -> Sem '[Slack, Error Text, Embed IO] a) ->
+  (Sem (Append slackEffs '[Slack, Error Text, Log, Embed IO]) a -> Sem '[Slack, Error Text, Log, Embed IO] a) ->
   (forall rInitial x. (Slack (Sem rInitial) x -> IO ())) ->
-  Sem (Append slackEffs '[Slack, Error Text, Embed IO]) a ->
+  Sem (Append slackEffs '[Slack, Error Text, Log, Embed IO]) a ->
   Expectation
 runSlackWithExpectations runToSlack expectations =
   runToSlack
     >>> runSlackWithExpectations'
     >>> runError
+    >>> interpretLogNull
     >>> runM
     >>> void
   where
@@ -90,3 +94,6 @@ json =
     >>> fromStrict
     >>> decode
     >>> note "failed to parse test JSON"
+
+runLogToList :: Sem (Log ': Output LogMessage ': r) a -> Sem r ([LogMessage], a)
+runLogToList = runOutputList . interpretLogOutput

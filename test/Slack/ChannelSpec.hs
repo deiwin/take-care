@@ -236,25 +236,25 @@ spec = do
 
   describe "setTopic" $ do
     it "posts to conversations.setTopic" $ do
-      Channels.setTopic "channel_name" "topic_message"
+      Channels.setTopic "channel_id" "topic_message"
         & runWithExpectations \case
           Post _ method -> method `shouldBe` "conversations.setTopic"
           _ -> expectationFailure "Expected a Post query"
 
-    it "passes channel name paramater" $ do
-      Channels.setTopic "channel_name" "topic_message"
+    it "passes channel ID paramater" $ do
+      Channels.setTopic "channel_id" "topic_message"
         & runWithExpectations \case
-          Post params _ -> params `shouldContain` [("channel", "channel_name")]
+          Post params _ -> params `shouldContain` [("channel", "channel_id")]
           _ -> expectationFailure "Expected a Post query"
 
     it "passes topic message paramater" $ do
-      Channels.setTopic "channel_name" "topic_message"
+      Channels.setTopic "channel_id" "topic_message"
         & runWithExpectations \case
           Post params _ -> params `shouldContain` [("topic", "topic_message")]
           _ -> expectationFailure "Expected a Post query"
 
     it "ignores response body" $ do
-      Channels.setTopic "channel_name" "topic_message"
+      Channels.setTopic "channel_id" "topic_message"
         & runPostConst "{\"whatever\": {}}"
         & (`shouldBe` Right ())
 

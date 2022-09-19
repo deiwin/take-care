@@ -95,13 +95,13 @@ let team =
 
         in    [ { rotation = Rotation.Weekly args.members.caretakers
                 , effects =
-                  [ Effect.SetSlackChannelTopic
+                  [ Effect.SlackSetChannelTopic
                       { name = channelName
                       , topic =
                           \(caretakers : List Text) ->
                             args.topic (concatSep ", " caretakers)
                       }
-                  , Effect.SetSlackGroup
+                  , Effect.SlackSetGroup
                       { handle = "${args.name}-caretaker"
                       , name = "Team ${args.name} caretaker(s)"
                       , channels = [] : List Text
@@ -110,7 +110,7 @@ let team =
                 }
               , { rotation = Rotation.Const allMembers
                 , effects =
-                  [ Effect.SetSlackGroup
+                  [ Effect.SlackSetGroup
                       { handle = "${args.name}-team"
                       , name = "Team ${args.name}"
                       , channels = [channelName]
@@ -156,18 +156,18 @@ command.
 ```dryRunExample
 $ docker run --rm -i -e "API_TOKEN=$API_TOKEN" deiwin/take-care:latest ensure --dry-run < teams.dhall
 For @U22222BOB:
-  SetSlackChannelTopic #tm-design: Stand-up *9:30* :paw_prints: Board :incoming_envelope: https://team.board/url :paw_prints: Caretaker @U22222BOB
-  SetSlackGroup: @design-caretaker {name = "Team design caretaker(s)", channels = []}
+  SlackSetChannelTopic #tm-design: Stand-up *9:30* :paw_prints: Board :incoming_envelope: https://team.board/url :paw_prints: Caretaker @U22222BOB
+  SlackSetGroup: @design-caretaker {name = "Team design caretaker(s)", channels = []}
 
 For @U111ALICE, @U22222BOB, @U333CAROL, @U4444DAVE:
-  SetSlackGroup: @design-team {name = "Team design", channels = ["tm-design"]}
+  SlackSetGroup: @design-team {name = "Team design", channels = ["tm-design"]}
 
 For @U55555EVE, @U77777GIL:
-  SetSlackChannelTopic #tm-dev: @U55555EVE, @U77777GIL are the caretakers
-  SetSlackGroup: @dev-caretaker {name = "Team dev caretaker(s)", channels = []}
+  SlackSetChannelTopic #tm-dev: @U55555EVE, @U77777GIL are the caretakers
+  SlackSetGroup: @dev-caretaker {name = "Team dev caretaker(s)", channels = []}
 
 For @U55555EVE, @U6666FAYE, @U77777GIL, @U88888HAL:
-  SetSlackGroup: @dev-team {name = "Team dev", channels = ["tm-dev"]}
+  SlackSetGroup: @dev-team {name = "Team dev", channels = ["tm-dev"]}
 ```
 
 And finally, run the `ensure` command.

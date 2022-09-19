@@ -180,7 +180,7 @@ applyEffect ::
   Effect ->
   Sem r ()
 applyEffect members = withLog \case
-  SetSlackGroup {handle, name, channels} -> do
+  SlackSetGroup {handle, name, channels} -> do
     Log.info (pack (printf "Finding or creating the following channels: %s .." (show channels)))
     existingGroup <- Groups.find handle
     defaultChannelIDs <- (^. Channel.id) <<$>> traverse findOrCreateChannel channels
@@ -199,7 +199,7 @@ applyEffect members = withLog \case
     where
       createNew = Groups.create handle name
       same a b = null (a \\ b) && null (b \\ a)
-  SetSlackChannelTopic {name, topic} -> do
+  SlackSetChannelTopic {name, topic} -> do
     Log.info (pack (printf "Finding or creating channel #%s .." name))
     channel <- findOrCreateChannel name
 

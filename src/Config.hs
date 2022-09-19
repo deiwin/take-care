@@ -75,14 +75,14 @@ showResolvedRotationEffects getDisplayName (members, effects) = interUnlines <$>
         <&> pack
     effectLines = padLeft 2 . pack <<$>> showEffect <$> effects
     showEffect = \case
-      SetSlackChannelTopic{name, topic} ->
+      SlackSetChannelTopic{name, topic} ->
         members
           & Set.toList
           & traverse getDisplayName
           <&> topic
-          <&> printf "SetSlackChannelTopic #%s: %s" name
-      SetSlackGroup{handle, name, channels} ->
-        return $ printf "SetSlackGroup: @%s {name = \"%s\", channels = %s}" handle name (show channels)
+          <&> printf "SlackSetChannelTopic #%s: %s" name
+      SlackSetGroup{handle, name, channels} ->
+        return $ printf "SlackSetGroup: @%s {name = \"%s\", channels = %s}" handle name (show channels)
 
 padLeft :: Int -> Text -> Text
 padLeft spaces = fmapLines (prefix <>)

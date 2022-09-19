@@ -76,12 +76,12 @@ spec = do
           [ Conf
               { rotation = Weekly [["user_id"]],
                 effects =
-                  [ SetSlackGroup
+                  [ SlackSetGroup
                       { handle = "team-caretaker",
                         name = "Team team caretaker(s)",
                         channels = []
                       },
-                    SetSlackChannelTopic
+                    SlackSetChannelTopic
                       { name = "tm-team",
                         topic = const "topic"
                       }
@@ -110,12 +110,12 @@ spec = do
           [ Conf
               { rotation = Weekly [["alice", "bob"]],
                 effects =
-                  [ SetSlackGroup
+                  [ SlackSetGroup
                       { handle = "team-caretaker",
                         name = "Team team caretaker(s)",
                         channels = []
                       },
-                    SetSlackChannelTopic
+                    SlackSetChannelTopic
                       { name = "tm-team",
                         topic = const "topic"
                       }
@@ -124,7 +124,7 @@ spec = do
             Conf
               { rotation = Const ["alice", "bob", "caroline"],
                 effects =
-                  [ SetSlackGroup
+                  [ SlackSetGroup
                       { handle = "team-team",
                         name = "Team team",
                         channels = ["tm-team"]
@@ -150,11 +150,11 @@ spec = do
                 Right
                   [trimming|
                     For Alice:
-                      SetSlackGroup: @team-caretaker {name = "Team team caretaker(s)", channels = []}
-                      SetSlackChannelTopic #tm-team: topic
+                      SlackSetGroup: @team-caretaker {name = "Team team caretaker(s)", channels = []}
+                      SlackSetChannelTopic #tm-team: topic
 
                     For Alice, Bob, Caroline:
-                      SetSlackGroup: @team-team {name = "Team team", channels = ["tm-team"]}
+                      SlackSetGroup: @team-team {name = "Team team", channels = ["tm-team"]}
                   |]
               )
           )
@@ -167,12 +167,12 @@ spec = do
           [ Conf
               { rotation = Weekly [["alice", "bob"]],
                 effects =
-                  [ SetSlackGroup
+                  [ SlackSetGroup
                       { handle = "design-caretaker",
                         name = "Team design caretaker(s)",
                         channels = []
                       },
-                    SetSlackChannelTopic
+                    SlackSetChannelTopic
                       { name = "tm-design",
                         topic = ("Caretaker is: " <>) . intercalate ", "
                       }
@@ -181,7 +181,7 @@ spec = do
             Conf
               { rotation = Const ["alice", "bob", "caroline"],
                 effects =
-                  [ SetSlackGroup
+                  [ SlackSetGroup
                       { handle = "design-team",
                         name = "Team design",
                         channels = ["tm-design"]
@@ -205,23 +205,23 @@ spec = do
                   LogMessage Info "Resolving current time ..",
                   LogMessage Info "Applying all configurations ..",
                   LogMessage Info "Applying all effects for a rotation ..",
-                  LogMessage Info "Applying to member IDs fromList [\"alice\"] the effect SetSlackGroup {handle = \"design-caretaker\", name = \"Team design caretaker(s)\", channels = []} ..",
+                  LogMessage Info "Applying to member IDs fromList [\"alice\"] the effect SlackSetGroup {handle = \"design-caretaker\", name = \"Team design caretaker(s)\", channels = []} ..",
                   LogMessage Info "Finding or creating the following channels: [] ..",
                   LogMessage Info "Finding or creating the group @design-caretaker ..",
                   LogMessage Info "Updating group members if changed from fromList [] to fromList [\"alice\"] ..",
                   LogMessage Info "Updating default channel IDs if changed from [] to [] ..",
-                  LogMessage Info "Finished applying effect SetSlackGroup {handle = \"design-caretaker\", name = \"Team design caretaker(s)\", channels = []}",
-                  LogMessage Info "Applying to member IDs fromList [\"alice\"] the effect SetSlackChannelTopic {name = \"tm-design\", topic = \"Caretaker is: input 1, input 2, ..\"} ..",
+                  LogMessage Info "Finished applying effect SlackSetGroup {handle = \"design-caretaker\", name = \"Team design caretaker(s)\", channels = []}",
+                  LogMessage Info "Applying to member IDs fromList [\"alice\"] the effect SlackSetChannelTopic {name = \"tm-design\", topic = \"Caretaker is: input 1, input 2, ..\"} ..",
                   LogMessage Info "Finding or creating channel #tm-design ..",
                   LogMessage Info "Updating topic if changed from \"\" to \"Caretaker is: Alice\" ..",
-                  LogMessage Info "Finished applying effect SetSlackChannelTopic {name = \"tm-design\", topic = \"Caretaker is: input 1, input 2, ..\"}",
+                  LogMessage Info "Finished applying effect SlackSetChannelTopic {name = \"tm-design\", topic = \"Caretaker is: input 1, input 2, ..\"}",
                   LogMessage Info "Applying all effects for a rotation ..",
-                  LogMessage Info "Applying to member IDs fromList [\"alice\",\"bob\",\"caroline\"] the effect SetSlackGroup {handle = \"design-team\", name = \"Team design\", channels = [\"tm-design\"]} ..",
+                  LogMessage Info "Applying to member IDs fromList [\"alice\",\"bob\",\"caroline\"] the effect SlackSetGroup {handle = \"design-team\", name = \"Team design\", channels = [\"tm-design\"]} ..",
                   LogMessage Info "Finding or creating the following channels: [\"tm-design\"] ..",
                   LogMessage Info "Finding or creating the group @design-team ..",
                   LogMessage Info "Updating group members if changed from fromList [] to fromList [\"alice\",\"bob\",\"caroline\"] ..",
                   LogMessage Info "Updating default channel IDs if changed from [\"id_tm-design\"] to [\"id_tm-design\"] ..",
-                  LogMessage Info "Finished applying effect SetSlackGroup {handle = \"design-team\", name = \"Team design\", channels = [\"tm-design\"]}",
+                  LogMessage Info "Finished applying effect SlackSetGroup {handle = \"design-team\", name = \"Team design\", channels = [\"tm-design\"]}",
                   LogMessage Info "Completed applying all configurations"
                 ],
                 Right
@@ -269,12 +269,12 @@ spec = do
           [ Conf
               { rotation = Const ["user-name"],
                 effects =
-                  [ SetSlackGroup
+                  [ SlackSetGroup
                       { handle = "group-handle",
                         name = "group-name",
                         channels = ["channel-name"]
                       },
-                    SetSlackGroup
+                    SlackSetGroup
                       { handle = "second-group-handle",
                         name = "second-group-name",
                         channels = ["channel-name"]

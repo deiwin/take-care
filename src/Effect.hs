@@ -21,11 +21,11 @@ instance Eq ([Text] -> Text) where
       inputs = ["input 1", "input 2", ".."]
 
 data Effect
-  = SetSlackChannelTopic
+  = SlackSetChannelTopic
       { name :: Text,
         topic :: [Text] -> Text
       }
-  | SetSlackGroup
+  | SlackSetGroup
       { handle :: Text,
         name :: Text,
         channels :: [Text]

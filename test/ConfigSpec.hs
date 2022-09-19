@@ -43,14 +43,14 @@ spec = do
                           )
                         ]
 
-  it "returns a group with SetSlackGroup effect" $ do
+  it "returns a group with SlackSetGroup effect" $ do
     confList <-
       parseConfList
         [trimming|
           let Effect = ./src/Effect.dhall
           let Rotation = ./src/Rotation.dhall
            in [ { rotation = Rotation.Const ["user-id"]
-                , effects = [ Effect.SetSlackGroup
+                , effects = [ Effect.SlackSetGroup
                                 { handle = "group-handle"
                                 , name = "group-name"
                                 , channels = ["channel-name"]
@@ -64,7 +64,7 @@ spec = do
     let resolvedRotationEffectsList = currentResolvedRotationEffects time <$> confList
     resolvedRotationEffectsList
       `shouldMatchList` [ ( Set.fromList ["user-id"],
-                            [ SetSlackGroup
+                            [ SlackSetGroup
                                 { handle = "group-handle",
                                   name = "group-name",
                                   channels = ["channel-name"]
@@ -80,7 +80,7 @@ spec = do
           let Effect = ./src/Effect.dhall
           let Rotation = ./src/Rotation.dhall
            in [ { rotation = Rotation.Weekly [["user-id-one", "user-id-two"]]
-                , effects = [ Effect.SetSlackGroup
+                , effects = [ Effect.SlackSetGroup
                                 { handle = "group-handle"
                                 , name = "group-name"
                                 , channels = ["channel-name"]
@@ -94,7 +94,7 @@ spec = do
     let resolvedRotationEffectsList = currentResolvedRotationEffects time <$> confList
     resolvedRotationEffectsList
       `shouldMatchList` [ ( Set.fromList ["user-id-one"],
-                            [ SetSlackGroup
+                            [ SlackSetGroup
                                 { handle = "group-handle",
                                   name = "group-name",
                                   channels = ["channel-name"]

@@ -64,21 +64,18 @@ a programmable configuration language with Haskell-like syntax.
 
 ```haskell
 let SlackEffect = ./src/Effect/Slack.dhall
+let SetGroup = SlackEffect.SetGroup
+let SetChannelTopic = SlackEffect.SetChannelTopic
 
 let Effect = ./src/Effect.dhall
+let Slack = Effect.Slack
 
 let Rotation = ./src/Rotation.dhall
-
 let Conf = ./src/Conf.dhall
 
-let concat =
-      https://raw.githubusercontent.com/dhall-lang/dhall-lang/v21.1.0/Prelude/List/concat.dhall
-
-let concatMap =
-      https://raw.githubusercontent.com/dhall-lang/dhall-lang/v21.1.0/Prelude/List/concatMap.dhall
-
-let concatSep =
-      https://raw.githubusercontent.com/dhall-lang/dhall-lang/v21.1.0/Prelude/Text/concatSep.dhall
+let concat = https://raw.githubusercontent.com/dhall-lang/dhall-lang/v21.1.0/Prelude/List/concat.dhall
+let concatMap = https://raw.githubusercontent.com/dhall-lang/dhall-lang/v21.1.0/Prelude/List/concatMap.dhall
+let concatSep = https://raw.githubusercontent.com/dhall-lang/dhall-lang/v21.1.0/Prelude/Text/concatSep.dhall
 
 let TeamArgs =
       { name : Text
@@ -97,13 +94,13 @@ let team =
 
         in    [ { rotation = Rotation.Weekly args.members.caretakers
                 , effects =
-                  [ Effect.Slack (SlackEffect.SetChannelTopic
+                  [ Slack (SetChannelTopic
                       { name = channelName
                       , topic =
                           \(caretakers : List Text) ->
                             args.topic (concatSep ", " caretakers)
                       })
-                  , Effect.Slack (SlackEffect.SetGroup
+                  , Slack (SetGroup
                       { handle = "${args.name}-caretaker"
                       , name = "Team ${args.name} caretaker(s)"
                       , channels = [] : List Text
@@ -112,7 +109,7 @@ let team =
                 }
               , { rotation = Rotation.Const allMembers
                 , effects =
-                  [ Effect.Slack (SlackEffect.SetGroup
+                  [ Slack (SetGroup
                       { handle = "${args.name}-team"
                       , name = "Team ${args.name}"
                       , channels = [channelName]

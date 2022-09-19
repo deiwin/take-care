@@ -66,11 +66,12 @@ spec = do
     let resolvedRotationEffectsList = currentResolvedRotationEffects time <$> confList
     resolvedRotationEffectsList
       `shouldMatchList` [ ( Set.fromList ["user-id"],
-                            [ Slack SetGroup
-                                { handle = "group-handle",
-                                  name = "group-name",
-                                  channels = ["channel-name"]
-                                }
+                            [ Slack
+                                SetGroup
+                                  { handle = "group-handle",
+                                    name = "group-name",
+                                    channels = ["channel-name"]
+                                  }
                             ]
                           )
                         ]
@@ -97,11 +98,12 @@ spec = do
     let resolvedRotationEffectsList = currentResolvedRotationEffects time <$> confList
     resolvedRotationEffectsList
       `shouldMatchList` [ ( Set.fromList ["user-id-one"],
-                            [ Slack SetGroup
-                                { handle = "group-handle",
-                                  name = "group-name",
-                                  channels = ["channel-name"]
-                                }
+                            [ Slack
+                                SetGroup
+                                  { handle = "group-handle",
+                                    name = "group-name",
+                                    channels = ["channel-name"]
+                                  }
                             ]
                           )
                         ]

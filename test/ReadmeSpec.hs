@@ -32,47 +32,53 @@ spec = do
     let resolvedRotationEffectsList = currentResolvedRotationEffects time <$> confList
     resolvedRotationEffectsList
       `shouldMatchList` [ ( Set.fromList ["U22222BOB"],
-                            [ Slack SetChannelTopic
-                                { name = "tm-design",
-                                  topic = \members ->
-                                    "Stand-up *9:30*"
-                                      <> " :paw_prints: Board :incoming_envelope: https://team.board/url"
-                                      <> " :paw_prints: Caretaker "
-                                      <> intercalate ", " members
-                                },
-                              Slack SetGroup
-                                { handle = "design-caretaker",
-                                  name = "Team design caretaker(s)",
-                                  channels = []
-                                }
+                            [ Slack
+                                SetChannelTopic
+                                  { name = "tm-design",
+                                    topic = \members ->
+                                      "Stand-up *9:30*"
+                                        <> " :paw_prints: Board :incoming_envelope: https://team.board/url"
+                                        <> " :paw_prints: Caretaker "
+                                        <> intercalate ", " members
+                                  },
+                              Slack
+                                SetGroup
+                                  { handle = "design-caretaker",
+                                    name = "Team design caretaker(s)",
+                                    channels = []
+                                  }
                             ]
                           ),
                           ( Set.fromList ["U111ALICE", "U22222BOB", "U333CAROL", "U4444DAVE"],
-                            [ Slack SetGroup
-                                { handle = "design-team",
-                                  name = "Team design",
-                                  channels = ["tm-design"]
-                                }
+                            [ Slack
+                                SetGroup
+                                  { handle = "design-team",
+                                    name = "Team design",
+                                    channels = ["tm-design"]
+                                  }
                             ]
                           ),
                           ( Set.fromList ["U55555EVE", "U77777GIL"],
-                            [ Slack SetChannelTopic
-                                { name = "tm-dev",
-                                  topic = \members -> intercalate ", " members <> " are the caretakers"
-                                },
-                              Slack SetGroup
-                                { handle = "dev-caretaker",
-                                  name = "Team dev caretaker(s)",
-                                  channels = []
-                                }
+                            [ Slack
+                                SetChannelTopic
+                                  { name = "tm-dev",
+                                    topic = \members -> intercalate ", " members <> " are the caretakers"
+                                  },
+                              Slack
+                                SetGroup
+                                  { handle = "dev-caretaker",
+                                    name = "Team dev caretaker(s)",
+                                    channels = []
+                                  }
                             ]
                           ),
                           ( Set.fromList ["U55555EVE", "U6666FAYE", "U77777GIL", "U88888HAL"],
-                            [ Slack SetGroup
-                                { handle = "dev-team",
-                                  name = "Team dev",
-                                  channels = ["tm-dev"]
-                                }
+                            [ Slack
+                                SetGroup
+                                  { handle = "dev-team",
+                                    name = "Team dev",
+                                    channels = ["tm-dev"]
+                                  }
                             ]
                           )
                         ]

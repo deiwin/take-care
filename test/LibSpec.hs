@@ -78,15 +78,17 @@ spec = do
           [ Conf
               { rotation = Weekly [["user_id"]],
                 effects =
-                  [ Slack SetGroup
-                      { handle = "team-caretaker",
-                        name = "Team team caretaker(s)",
-                        channels = []
-                      },
-                    Slack SetChannelTopic
-                      { name = "tm-team",
-                        topic = const "topic"
-                      }
+                  [ Slack
+                      SetGroup
+                        { handle = "team-caretaker",
+                          name = "Team team caretaker(s)",
+                          channels = []
+                        },
+                    Slack
+                      SetChannelTopic
+                        { name = "tm-team",
+                          topic = const "topic"
+                        }
                   ]
               }
           ]
@@ -112,25 +114,28 @@ spec = do
           [ Conf
               { rotation = Weekly [["alice", "bob"]],
                 effects =
-                  [ Slack SetGroup
-                      { handle = "team-caretaker",
-                        name = "Team team caretaker(s)",
-                        channels = []
-                      },
-                    Slack SetChannelTopic
-                      { name = "tm-team",
-                        topic = const "topic"
-                      }
+                  [ Slack
+                      SetGroup
+                        { handle = "team-caretaker",
+                          name = "Team team caretaker(s)",
+                          channels = []
+                        },
+                    Slack
+                      SetChannelTopic
+                        { name = "tm-team",
+                          topic = const "topic"
+                        }
                   ]
               },
             Conf
               { rotation = Const ["alice", "bob", "caroline"],
                 effects =
-                  [ Slack SetGroup
-                      { handle = "team-team",
-                        name = "Team team",
-                        channels = ["tm-team"]
-                      }
+                  [ Slack
+                      SetGroup
+                        { handle = "team-team",
+                          name = "Team team",
+                          channels = ["tm-team"]
+                        }
                   ]
               }
           ]
@@ -169,25 +174,28 @@ spec = do
           [ Conf
               { rotation = Weekly [["alice", "bob"]],
                 effects =
-                  [ Slack SetGroup
-                      { handle = "design-caretaker",
-                        name = "Team design caretaker(s)",
-                        channels = []
-                      },
-                    Slack SetChannelTopic
-                      { name = "tm-design",
-                        topic = ("Caretaker is: " <>) . intercalate ", "
-                      }
+                  [ Slack
+                      SetGroup
+                        { handle = "design-caretaker",
+                          name = "Team design caretaker(s)",
+                          channels = []
+                        },
+                    Slack
+                      SetChannelTopic
+                        { name = "tm-design",
+                          topic = ("Caretaker is: " <>) . intercalate ", "
+                        }
                   ]
               },
             Conf
               { rotation = Const ["alice", "bob", "caroline"],
                 effects =
-                  [ Slack SetGroup
-                      { handle = "design-team",
-                        name = "Team design",
-                        channels = ["tm-design"]
-                      }
+                  [ Slack
+                      SetGroup
+                        { handle = "design-team",
+                          name = "Team design",
+                          channels = ["tm-design"]
+                        }
                   ]
               }
           ]
@@ -271,16 +279,18 @@ spec = do
           [ Conf
               { rotation = Const ["user-name"],
                 effects =
-                  [ Slack SetGroup
-                      { handle = "group-handle",
-                        name = "group-name",
-                        channels = ["channel-name"]
-                      },
-                    Slack SetGroup
-                      { handle = "second-group-handle",
-                        name = "second-group-name",
-                        channels = ["channel-name"]
-                      }
+                  [ Slack
+                      SetGroup
+                        { handle = "group-handle",
+                          name = "group-name",
+                          channels = ["channel-name"]
+                        },
+                    Slack
+                      SetGroup
+                        { handle = "second-group-handle",
+                          name = "second-group-name",
+                          channels = ["channel-name"]
+                        }
                   ]
               }
           ]

@@ -3,6 +3,7 @@ module ReadmeSpec (spec) where
 import Config
   ( Conf,
     Effect (..),
+    SlackEffect (..),
     currentResolvedRotationEffects,
     runConfig,
     showResolvedRotationEffectsList,
@@ -31,7 +32,7 @@ spec = do
     let resolvedRotationEffectsList = currentResolvedRotationEffects time <$> confList
     resolvedRotationEffectsList
       `shouldMatchList` [ ( Set.fromList ["U22222BOB"],
-                            [ SlackSetChannelTopic
+                            [ Slack SetChannelTopic
                                 { name = "tm-design",
                                   topic = \members ->
                                     "Stand-up *9:30*"
@@ -39,7 +40,7 @@ spec = do
                                       <> " :paw_prints: Caretaker "
                                       <> intercalate ", " members
                                 },
-                              SlackSetGroup
+                              Slack SetGroup
                                 { handle = "design-caretaker",
                                   name = "Team design caretaker(s)",
                                   channels = []
@@ -47,7 +48,7 @@ spec = do
                             ]
                           ),
                           ( Set.fromList ["U111ALICE", "U22222BOB", "U333CAROL", "U4444DAVE"],
-                            [ SlackSetGroup
+                            [ Slack SetGroup
                                 { handle = "design-team",
                                   name = "Team design",
                                   channels = ["tm-design"]
@@ -55,11 +56,11 @@ spec = do
                             ]
                           ),
                           ( Set.fromList ["U55555EVE", "U77777GIL"],
-                            [ SlackSetChannelTopic
+                            [ Slack SetChannelTopic
                                 { name = "tm-dev",
                                   topic = \members -> intercalate ", " members <> " are the caretakers"
                                 },
-                              SlackSetGroup
+                              Slack SetGroup
                                 { handle = "dev-caretaker",
                                   name = "Team dev caretaker(s)",
                                   channels = []
@@ -67,7 +68,7 @@ spec = do
                             ]
                           ),
                           ( Set.fromList ["U55555EVE", "U6666FAYE", "U77777GIL", "U88888HAL"],
-                            [ SlackSetGroup
+                            [ Slack SetGroup
                                 { handle = "dev-team",
                                   name = "Team dev",
                                   channels = ["tm-dev"]

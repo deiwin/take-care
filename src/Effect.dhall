@@ -1,5 +1,6 @@
+let SlackEffect = ./Effect/Slack.dhall
 let Effect =
-      < SlackSetChannelTopic : { name : Text, topic : List Text -> Text }
-      | SlackSetGroup : { handle : Text, name : Text, channels : List Text}
+      < Slack : SlackEffect
+      | NoOp
       >
  in Effect

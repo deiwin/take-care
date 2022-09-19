@@ -63,9 +63,11 @@ according to your needs. The configuration is written in [Dhall][3],
 a programmable configuration language with Haskell-like syntax.
 
 ```haskell
-let Rotation = ./src/Rotation.dhall
+let SlackEffect = ./src/Effect/Slack.dhall
 
 let Effect = ./src/Effect.dhall
+
+let Rotation = ./src/Rotation.dhall
 
 let Conf = ./src/Conf.dhall
 
@@ -95,26 +97,26 @@ let team =
 
         in    [ { rotation = Rotation.Weekly args.members.caretakers
                 , effects =
-                  [ Effect.SlackSetChannelTopic
+                  [ Effect.Slack (SlackEffect.SetChannelTopic
                       { name = channelName
                       , topic =
                           \(caretakers : List Text) ->
                             args.topic (concatSep ", " caretakers)
-                      }
-                  , Effect.SlackSetGroup
+                      })
+                  , Effect.Slack (SlackEffect.SetGroup
                       { handle = "${args.name}-caretaker"
                       , name = "Team ${args.name} caretaker(s)"
                       , channels = [] : List Text
-                      }
+                      })
                   ]
                 }
               , { rotation = Rotation.Const allMembers
                 , effects =
-                  [ Effect.SlackSetGroup
+                  [ Effect.Slack (SlackEffect.SetGroup
                       { handle = "${args.name}-team"
                       , name = "Team ${args.name}"
                       , channels = [channelName]
-                      }
+                      })
                   ]
                 }
               ]
@@ -156,18 +158,18 @@ command.
 ```dryRunExample
 $ docker run --rm -i -e "API_TOKEN=$API_TOKEN" deiwin/take-care:latest ensure --dry-run < teams.dhall
 For @U22222BOB:
-  SlackSetChannelTopic #tm-design: Stand-up *9:30* :paw_prints: Board :incoming_envelope: https://team.board/url :paw_prints: Caretaker @U22222BOB
-  SlackSetGroup: @design-caretaker {name = "Team design caretaker(s)", channels = []}
+  Slack.SetChannelTopic #tm-design: Stand-up *9:30* :paw_prints: Board :incoming_envelope: https://team.board/url :paw_prints: Caretaker @U22222BOB
+  Slack.SetGroup: @design-caretaker {name = "Team design caretaker(s)", channels = []}
 
 For @U111ALICE, @U22222BOB, @U333CAROL, @U4444DAVE:
-  SlackSetGroup: @design-team {name = "Team design", channels = ["tm-design"]}
+  Slack.SetGroup: @design-team {name = "Team design", channels = ["tm-design"]}
 
 For @U55555EVE, @U77777GIL:
-  SlackSetChannelTopic #tm-dev: @U55555EVE, @U77777GIL are the caretakers
-  SlackSetGroup: @dev-caretaker {name = "Team dev caretaker(s)", channels = []}
+  Slack.SetChannelTopic #tm-dev: @U55555EVE, @U77777GIL are the caretakers
+  Slack.SetGroup: @dev-caretaker {name = "Team dev caretaker(s)", channels = []}
 
 For @U55555EVE, @U6666FAYE, @U77777GIL, @U88888HAL:
-  SlackSetGroup: @dev-team {name = "Team dev", channels = ["tm-dev"]}
+  Slack.SetGroup: @dev-team {name = "Team dev", channels = ["tm-dev"]}
 ```
 
 And finally, run the `ensure` command.

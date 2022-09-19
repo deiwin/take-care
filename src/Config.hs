@@ -6,6 +6,7 @@ module Config
   ( Conf (..),
     Rotation (..),
     Effect (..),
+    SlackEffect (..),
     ResolvedRotationEffects,
     currentResolvedRotationEffects,
     showResolvedRotationEffectsList,
@@ -19,15 +20,16 @@ where
 
 import Data.Function ((&))
 import Data.Functor ((<&>))
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Data.Text (Text, intercalate, lines, pack, replicate)
 import Data.Time.Calendar.WeekDate (toWeekDate)
 import Data.Time.Clock (UTCTime (..))
 import Dhall (FromDhall)
 import qualified Dhall (auto, input)
-import Data.Set (Set)
-import qualified Data.Set as Set
 import Dhall.TH (HaskellType (..), makeHaskellTypes)
 import Effect (Effect (..))
+import Effect.Slack (SlackEffect (..))
 import GHC.Generics (Generic)
 import Polysemy (Embed, InterpreterFor, Member, embed, interpret, makeSem)
 import Text.Printf (printf)
@@ -75,14 +77,17 @@ showResolvedRotationEffects getDisplayName (members, effects) = interUnlines <$>
         <&> pack
     effectLines = padLeft 2 . pack <<$>> showEffect <$> effects
     showEffect = \case
-      SlackSetChannelTopic{name, topic} ->
-        members
-          & Set.toList
-          & traverse getDisplayName
-          <&> topic
-          <&> printf "SlackSetChannelTopic #%s: %s" name
-      SlackSetGroup{handle, name, channels} ->
-        return $ printf "SlackSetGroup: @%s {name = \"%s\", channels = %s}" handle name (show channels)
+      NoOp -> return "NoOp"
+      Slack effect ->
+        ("Slack." <>) <$> case effect of
+          SetChannelTopic {name, topic} ->
+            members
+              & Set.toList
+              & traverse getDisplayName
+              <&> topic
+              <&> printf "SetChannelTopic #%s: %s" name
+          SetGroup {handle, name, channels} ->
+            return $ printf "SetGroup: @%s {name = \"%s\", channels = %s}" handle name (show channels)
 
 padLeft :: Int -> Text -> Text
 padLeft spaces = fmapLines (prefix <>)

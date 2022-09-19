@@ -4,8 +4,6 @@ module ConfigSpec (spec) where
 
 import Config
   ( Conf,
-    Effect (..),
-    SlackEffect (..),
     currentResolvedRotationEffects,
     runConfig,
   )
@@ -13,6 +11,8 @@ import qualified Config (parse)
 import qualified Data.Set as Set
 import Data.Text (Text)
 import Data.Time.Format.ISO8601 (iso8601ParseM)
+import Effect (Effect (..))
+import Effect.Slack (SlackEffect (..))
 import NeatInterpolation (trimming)
 import Polysemy (runM)
 import Test.Hspec

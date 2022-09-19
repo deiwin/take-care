@@ -2,7 +2,7 @@
 
 module LibSpec (spec) where
 
-import Config (Conf (..), Config (..), Effect (..), SlackEffect (..), Rotation (..))
+import Config (Conf (..), Config (..), Rotation (..))
 import Control.Arrow (first, second)
 import Control.Category ((>>>))
 import Control.Lens ((^.))
@@ -13,6 +13,8 @@ import qualified Data.Map as Map
 import Data.Text (Text, intercalate)
 import Data.Time.Clock (UTCTime)
 import Data.Time.Format.ISO8601 (iso8601ParseM)
+import Effect (Effect (..))
+import Effect.Slack (SlackEffect (..))
 import IO (Time (..))
 import Lib (dryRunEnsure, ensure, listUsers)
 import NeatInterpolation (trimming)

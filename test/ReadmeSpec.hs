@@ -2,8 +2,6 @@ module ReadmeSpec (spec) where
 
 import Config
   ( Conf,
-    Effect (..),
-    SlackEffect (..),
     currentResolvedRotationEffects,
     runConfig,
     showResolvedRotationEffectsList,
@@ -14,6 +12,8 @@ import qualified Data.Set as Set
 import Data.Text (Text, intercalate, lines, unlines)
 import Data.Text.IO (readFile)
 import Data.Time.Format.ISO8601 (iso8601ParseM)
+import Effect (Effect (..))
+import Effect.Slack (SlackEffect (..))
 import Polysemy (runM)
 import Test.Hspec
   ( Spec,

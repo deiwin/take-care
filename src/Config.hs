@@ -5,8 +5,6 @@
 module Config
   ( Conf (..),
     Rotation (..),
-    Effect (..),
-    SlackEffect (..),
     ResolvedRotationEffects,
     currentResolvedRotationEffects,
     showResolvedRotationEffectsList,

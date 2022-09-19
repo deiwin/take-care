@@ -10,7 +10,6 @@ where
 import Config
   ( Conf (..),
     Config,
-    Effect (..),
     currentResolvedRotationEffects,
     runConfig,
     showResolvedRotationEffectsList,
@@ -23,6 +22,7 @@ import Data.Functor ((<&>))
 import Data.Set (Set)
 import Data.Text (Text, pack, unlines)
 import Data.Time.Clock (UTCTime)
+import Effect (Effect (..))
 import Effect.Slack.IO as Slack (apply)
 import IO (Env, Time, runEnv, runTime)
 import qualified IO as Time (getCurrent)

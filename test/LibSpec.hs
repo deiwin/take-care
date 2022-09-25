@@ -213,6 +213,7 @@ spec = do
         & ( `shouldBe`
               ( [ LogMessage Info "Parsing configuration ..",
                   LogMessage Info "Resolving current time ..",
+                  LogMessage Info "Resolving rotation effects ..",
                   LogMessage Info "Applying all configurations ..",
                   LogMessage Info "Applying all effects for a rotation ..",
                   LogMessage Info "Applying to member IDs fromList [\"alice\"] the effect Slack (SetGroup {handle = \"design-caretaker\", name = \"Team design caretaker(s)\", channels = []}) ..",

@@ -4,7 +4,7 @@ import Config
   ( Conf,
     currentResolvedRotationEffects,
     runConfig,
-    showResolvedRotationEffectsList,
+    showDryRun,
   )
 import qualified Config (parse)
 import Data.Function ((&))
@@ -92,7 +92,7 @@ spec = do
     let resolvedRotationEffectsList = currentResolvedRotationEffects time <$> confList
 
     result <- dryRunExample
-    showResolvedRotationEffectsList resolvedRotationEffectsList
+    showDryRun resolvedRotationEffectsList
       & mockRunUser
       & runError
       & run

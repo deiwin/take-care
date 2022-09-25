@@ -38,8 +38,8 @@ import qualified Slack.Group as Groups
   )
 import Slack.User as User
   ( Users,
-    id,
     displayName,
+    id,
   )
 import qualified Slack.User as Users (find)
 import Text.Printf (printf)
@@ -56,7 +56,7 @@ apply ::
   Set Text ->
   SlackEffect ->
   Sem r ()
-apply members = \case
+apply memberEmails = \case
   SetGroup {handle, name, channels} -> do
     Log.info (pack (printf "Finding or creating the following channels: %s .." (show channels)))
     existingGroup <- Groups.find handle
@@ -66,17 +66,16 @@ apply members = \case
     slackGroup <- maybe (createNew defaultChannelIDs) return existingGroup
     let groupID = slackGroup ^. Group.id
 
-    currentMembers <- Set.fromList <$> Groups.getMembers groupID
-    Log.info (pack (printf "Updating group members if changed from %s to %s .." (show currentMembers) (show members)))
-    members
-      & Set.toList
-      & traverse getUserID
-      >>= Groups.setMembers groupID
-      & unless (members == currentMembers)
+    currentMemberIDs <- Set.fromList <$> Groups.getMembers groupID
+    newMemberIDs <- Set.fromList <$> traverse getUserID (Set.toList memberEmails)
+    unless (newMemberIDs == currentMemberIDs) do
+      Log.info (pack (printf "Updating group member IDs from %s to %s .." (show currentMemberIDs) (show newMemberIDs)))
+      Groups.setMembers groupID $ Set.toList newMemberIDs
 
     let currentChannels = slackGroup ^. channelIDs
-    Log.info (pack (printf "Updating default channel IDs if changed from %s to %s .." (show currentChannels) (show defaultChannelIDs)))
-    unless (same defaultChannelIDs currentChannels) $ Groups.setChannels groupID defaultChannelIDs
+    unless (same defaultChannelIDs currentChannels) do
+      Log.info (pack (printf "Updating default channel IDs from %s to %s .." (show currentChannels) (show defaultChannelIDs)))
+      Groups.setChannels groupID defaultChannelIDs
     where
       createNew = Groups.create handle name
       same a b = null (a \\ b) && null (b \\ a)
@@ -84,7 +83,7 @@ apply members = \case
     Log.info (pack (printf "Finding or creating channel #%s .." name))
     channel <- findOrCreateChannel name
 
-    newTopic <- topic <$> traverse getDisplayName (Set.toList members)
+    newTopic <- topic <$> traverse getDisplayName (Set.toList memberEmails)
     Log.info (pack (printf "Updating topic if changed from \"%s\" to \"%s\" .." (channel ^. Channel.topic) newTopic))
     unless
       (same (channel ^. Channel.topic) newTopic)
@@ -101,15 +100,16 @@ showDryRun ::
   Set Text ->
   SlackEffect ->
   Sem r Text
-showDryRun members = fmap (pack . ("Slack." <>)) . \case
-  SetChannelTopic {name, topic} ->
-    members
-      & Set.toList
-      & traverse getDisplayName
-      <&> topic
-      <&> printf "SetChannelTopic #%s: %s" name
-  SetGroup {handle, name, channels} ->
-    return $ printf "SetGroup: @%s {name = \"%s\", channels = %s}" handle name (show channels)
+showDryRun memberEmails =
+  fmap (pack . ("Slack." <>)) . \case
+    SetChannelTopic {name, topic} ->
+      memberEmails
+        & Set.toList
+        & traverse getDisplayName
+        <&> topic
+        <&> printf "SetChannelTopic #%s: %s" name
+    SetGroup {handle, name, channels} ->
+      return $ printf "SetGroup: @%s {name = \"%s\", channels = %s}" handle name (show channels)
 
 getUserID :: Members '[Users, Error Text] r => Text -> Sem r Text
 getUserID email =

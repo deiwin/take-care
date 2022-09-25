@@ -100,13 +100,15 @@ spec = do
               "members": [{
                 "id": "id",
                 "name": "name",
-                "profile": {}
+                "profile": {
+                  "email": "name@example.com"
+                }
               }]
             }
           |]
           ]
         & snd -- Ignore logs
-        & (`shouldBe` Right [User {_id = "id", _displayName = "@name"}])
+        & (`shouldBe` Right [User {_id = "id", _displayName = "@name", _email = "name@example.com"}])
 
     it "uses 'name' field if 'display_name' is an empty string" $ do
       Users.listAll
@@ -117,14 +119,15 @@ spec = do
                 "id": "id",
                 "name": "name",
                 "profile": {
-                  "display_name": ""
+                  "display_name": "",
+                  "email": "name@example.com"
                 }
               }]
             }
           |]
           ]
         & snd -- Ignore logs
-        & (`shouldBe` Right [User {_id = "id", _displayName = "@name"}])
+        & (`shouldBe` Right [User {_id = "id", _displayName = "@name", _email = "name@example.com"}])
 
     it "returns the User objects" $ do
       Users.listAll
@@ -135,13 +138,15 @@ spec = do
                   "id": "id",
                   "name": "name",
                   "profile": {
-                    "display_name": "display_name"
+                    "display_name": "display_name",
+                    "email": "name@example.com"
                   }
                 }, {
                   "id": "id2",
                   "name": "name2",
                   "profile": {
-                    "display_name": "display_name2"
+                    "display_name": "display_name2",
+                    "email": "name2@example.com"
                   }
                 }]
               }
@@ -152,8 +157,8 @@ spec = do
                   LogMessage Info "Building user cache .."
                 ],
                 Right
-                  [ User {_id = "id", _displayName = "@display_name"},
-                    User {_id = "id2", _displayName = "@display_name2"}
+                  [ User {_id = "id2", _displayName = "@display_name2", _email = "name2@example.com"},
+                    User {_id = "id", _displayName = "@display_name", _email = "name@example.com"}
                   ]
               )
           )
@@ -168,18 +173,19 @@ spec = do
                   "id": "id",
                   "name": "name",
                   "profile": {
-                    "display_name": "display_name"
+                    "display_name": "display_name",
+                    "email": "name@example.com"
                   }
                 }]
               }
             |]
           ]
         & snd -- Ignore logs
-        & (`shouldBe` Right [User {_id = "id", _displayName = "@display_name"}])
+        & (`shouldBe` Right [User {_id = "id", _displayName = "@display_name", _email = "name@example.com"}])
 
   describe "find" $ do
     it "returns Nothing when user not found" $ do
-      Users.find "missing_id"
+      Users.find "missing_email@example.com"
         & runGetPaginatedConst
           [ [trimming|
               {
@@ -187,13 +193,15 @@ spec = do
                   "id": "id",
                   "name": "name",
                   "profile": {
-                    "display_name": "display_name"
+                    "display_name": "display_name",
+                    "email": "name@example.com"
                   }
                 }, {
                   "id": "id2",
                   "name": "name2",
                   "profile": {
-                    "display_name": "display_name2"
+                    "display_name": "display_name2",
+                    "email": "name2@example.com"
                   }
                 }]
               }
@@ -203,7 +211,7 @@ spec = do
         & (`shouldBe` Right Nothing)
 
     it "returns the right user" $ do
-      Users.find "id2"
+      Users.find "name2@example.com"
         & runGetPaginatedConst
           [ [trimming|
               {
@@ -211,28 +219,30 @@ spec = do
                   "id": "id",
                   "name": "name",
                   "profile": {
-                    "display_name": "display_name"
+                    "display_name": "display_name",
+                    "email": "name@example.com"
                   }
                 }, {
                   "id": "id2",
                   "name": "name2",
                   "profile": {
-                    "display_name": "display_name2"
+                    "display_name": "display_name2",
+                    "email": "name2@example.com"
                   }
                 }]
               }
             |]
           ]
         & ( `shouldBe`
-              ( [ LogMessage Info "Finding user with ID id2 ..",
+              ( [ LogMessage Info "Finding user with email name2@example.com ..",
                   LogMessage Info "Building user cache .."
                 ],
-                Right (Just (User {_id = "id2", _displayName = "@display_name2"}))
+                Right (Just (User {_id = "id2", _displayName = "@display_name2", _email = "name2@example.com"}))
               )
           )
 
     it "returns the right user from the second page" $ do
-      Users.find "id2"
+      Users.find "name2@example.com"
         & runGetPaginatedConst
           [ [trimming|
               {
@@ -240,7 +250,8 @@ spec = do
                   "id": "id",
                   "name": "name",
                   "profile": {
-                    "display_name": "display_name"
+                    "display_name": "display_name",
+                    "email": "name@example.com"
                   }
                 }]
               }
@@ -251,14 +262,15 @@ spec = do
                   "id": "id2",
                   "name": "name2",
                   "profile": {
-                    "display_name": "display_name2"
+                    "display_name": "display_name2",
+                    "email": "name2@example.com"
                   }
                 }]
               }
             |]
           ]
         & snd -- Ignore logs
-        & (`shouldBe` Right (Just (User {_id = "id2", _displayName = "@display_name2"})))
+        & (`shouldBe` Right (Just (User {_id = "id2", _displayName = "@display_name2", _email = "name2@example.com"})))
 
   context "for a program with multiple find and listAll calls" $ do
     it "only calls users.list once for multiple find and listAll calls" $ do
@@ -280,19 +292,19 @@ spec = do
     it "logs the building and usage of the cache" $ do
       let program =
             do
-              first <- Users.find "first_ID"
+              first <- Users.find "first@example.com"
               all <- Users.listAll
-              second <- Users.find "second_ID"
+              second <- Users.find "second@example.com"
               return (first, all, second)
 
       program
         & runGetPaginatedConst []
         & ( `shouldBe`
-              ( [ LogMessage Info "Finding user with ID first_ID ..",
+              ( [ LogMessage Info "Finding user with email first@example.com ..",
                   LogMessage Info "Building user cache ..",
                   LogMessage Info "Listing all users ..",
                   LogMessage Info "Using cached user map ..",
-                  LogMessage Info "Finding user with ID second_ID ..",
+                  LogMessage Info "Finding user with email second@example.com ..",
                   LogMessage Info "Using cached user map .."
                 ],
                 Right (Nothing, [], Nothing)

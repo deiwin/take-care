@@ -38,6 +38,7 @@ import qualified Slack.Group as Groups
   )
 import Slack.User as User
   ( Users,
+    id,
     displayName,
   )
 import qualified Slack.User as Users (find)
@@ -67,7 +68,11 @@ apply members = \case
 
     currentMembers <- Set.fromList <$> Groups.getMembers groupID
     Log.info (pack (printf "Updating group members if changed from %s to %s .." (show currentMembers) (show members)))
-    unless (members == currentMembers) $ Groups.setMembers groupID $ Set.toList members
+    members
+      & Set.toList
+      & traverse getUserID
+      >>= Groups.setMembers groupID
+      & unless (members == currentMembers)
 
     let currentChannels = slackGroup ^. channelIDs
     Log.info (pack (printf "Updating default channel IDs if changed from %s to %s .." (show currentChannels) (show defaultChannelIDs)))
@@ -106,10 +111,16 @@ showDryRun members = fmap (pack . ("Slack." <>)) . \case
   SetGroup {handle, name, channels} ->
     return $ printf "SetGroup: @%s {name = \"%s\", channels = %s}" handle name (show channels)
 
+getUserID :: Members '[Users, Error Text] r => Text -> Sem r Text
+getUserID email =
+  Users.find email
+    >>= note (pack (printf "Could not find user with email: %s" email))
+    <&> (^. User.id)
+
 getDisplayName :: Members '[Users, Error Text] r => Text -> Sem r Text
-getDisplayName id =
-  Users.find id
-    >>= note (pack (printf "Could not find user with ID: %s" id))
+getDisplayName email =
+  Users.find email
+    >>= note (pack (printf "Could not find user with email: %s" email))
     <&> (^. User.displayName)
 
 findOrCreateChannel ::

@@ -51,7 +51,7 @@ apply members = withLog \case
       Effect ->
       Sem r a
     withLog f effect = do
-      Log.info (pack (printf "Applying to member IDs %s the effect %s .." (show members) (show effect)))
+      Log.info (pack (printf "Applying to members %s the effect %s .." (show members) (show effect)))
       result <- f effect
       Log.info (pack (printf "Finished applying effect %s" (show effect)))
       return result

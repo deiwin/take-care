@@ -2,6 +2,7 @@ module Slack.User
   ( User (..),
     id,
     displayName,
+    email,
     Users (..),
     Effects,
     find,
@@ -33,7 +34,8 @@ import Prelude hiding (id)
 
 data User = User
   { _id :: Text,
-    _displayName :: Text
+    _displayName :: Text,
+    _email :: Text
   }
   deriving (Generic, Show, Eq)
 
@@ -45,10 +47,13 @@ instance FromJSON User where
     name <- o .: "name"
 
     profile <- o .: "profile"
+
     displayName <- profile .:? "display_name"
     let nonEmptyDisplayName = displayName >>= (\x -> if T.null x then Nothing else Just x)
-
     let _displayName = "@" <> fromMaybe name nonEmptyDisplayName
+
+    _email <- profile .: "email"
+
     return User {..}
 
 data Users m a where
@@ -57,9 +62,9 @@ data Users m a where
 
 makeSem ''Users
 
-type ID = Text
+type Email = Text
 
-type UsersStore = (Bool, Map ID User)
+type UsersStore = (Bool, Map Email User)
 
 type Effects =
   '[ Users,
@@ -74,10 +79,10 @@ runUsers = evalState (False, Map.empty) . interpretWithCache
       ListAll -> do
         Log.info "Listing all users .."
         fmap snd . Map.toList <$> getAllThroughCache
-      Find id -> do
-        Log.info (pack (printf "Finding user with ID %s .." id))
-        Map.lookup id <$> getAllThroughCache
-    getAllThroughCache :: Members '[Slack, Error Text, State UsersStore, Log] r => Sem r (Map ID User)
+      Find email -> do
+        Log.info (pack (printf "Finding user with email %s .." email))
+        Map.lookup email <$> getAllThroughCache
+    getAllThroughCache :: Members '[Slack, Error Text, State UsersStore, Log] r => Sem r (Map Email User)
     getAllThroughCache = do
       (alreadyRanListAll, map) <- get
       if alreadyRanListAll
@@ -87,7 +92,7 @@ runUsers = evalState (False, Map.empty) . interpretWithCache
         else do
           Log.info "Building user cache .."
           users <- listAllUsers
-          let newMap = Map.fromList ((\u -> (u ^. id, u)) <$> users)
+          let newMap = Map.fromList ((\u -> (u ^. email, u)) <$> users)
           put (True, newMap)
           return newMap
 

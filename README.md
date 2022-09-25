@@ -123,8 +123,8 @@ let teams = concatMap TeamArgs Conf team
 
 in    teams
         [ { members =
-            { caretakers = [ [ "U111ALICE", "U22222BOB", "U333CAROL" ] ]
-            , others = [ "U4444DAVE" ]
+            { caretakers = [ [ "alice@example.com", "bob@example.com", "carol@example.com" ] ]
+            , others = [ "dave@example.com" ]
             }
           , name = "design"
           , topic =
@@ -139,7 +139,7 @@ in    teams
           }
         , { members =
             { caretakers =
-              [ [ "U55555EVE", "U6666FAYE" ], [ "U77777GIL", "U88888HAL" ] ]
+              [ [ "eve@example.com", "faye@example.com" ], [ "gil@example.com", "hal@example.com" ] ]
             , others = [] : List Text
             }
           , name = "dev"
@@ -154,18 +154,18 @@ command.
 
 ```dryRunExample
 $ docker run --rm -i -e "API_TOKEN=$API_TOKEN" deiwin/take-care:latest ensure --dry-run < teams.dhall
-For U22222BOB:
-  Slack.SetChannelTopic #tm-design: Stand-up *9:30* :paw_prints: Board :incoming_envelope: https://team.board/url :paw_prints: Caretaker @U22222BOB
+For bob@example.com:
+  Slack.SetChannelTopic #tm-design: Stand-up *9:30* :paw_prints: Board :incoming_envelope: https://team.board/url :paw_prints: Caretaker @bob
   Slack.SetGroup: @design-caretaker {name = "Team design caretaker(s)", channels = []}
 
-For U111ALICE, U22222BOB, U333CAROL, U4444DAVE:
+For alice@example.com, bob@example.com, carol@example.com, dave@example.com:
   Slack.SetGroup: @design-team {name = "Team design", channels = ["tm-design"]}
 
-For U55555EVE, U77777GIL:
-  Slack.SetChannelTopic #tm-dev: @U55555EVE, @U77777GIL are the caretakers
+For eve@example.com, gil@example.com:
+  Slack.SetChannelTopic #tm-dev: @eve, @gil are the caretakers
   Slack.SetGroup: @dev-caretaker {name = "Team dev caretaker(s)", channels = []}
 
-For U55555EVE, U6666FAYE, U77777GIL, U88888HAL:
+For eve@example.com, faye@example.com, gil@example.com, hal@example.com:
   Slack.SetGroup: @dev-team {name = "Team dev", channels = ["tm-dev"]}
 ```
 
@@ -201,6 +201,7 @@ The `ensure` command _ensures_ that
   - `usergroups:read`
   - `usergroups:write` for managing user groups
   - `users:read` for finding individual users' Slack handles
+  - `users:read.email` for finding user info based on their email
 - Save the permission changes.
 - In the same **OAuth & Permissions** section, scroll to the top and click on
   the **Install App to Workspace** button and authorize the installation.

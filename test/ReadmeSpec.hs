@@ -10,6 +10,7 @@ import qualified Config (parse)
 import Data.Function ((&))
 import qualified Data.Set as Set
 import Data.Text (Text, intercalate, lines, unlines)
+import qualified Data.Text as T (takeWhile)
 import Data.Text.IO (readFile)
 import Data.Time.Format.ISO8601 (iso8601ParseM)
 import Effect (Effect (..))
@@ -34,7 +35,7 @@ spec = do
 
     let resolvedRotationEffectsList = currentResolvedRotationEffects time <$> confList
     resolvedRotationEffectsList
-      `shouldMatchList` [ ( Set.fromList ["U22222BOB"],
+      `shouldMatchList` [ ( Set.fromList ["bob@example.com"],
                             [ Slack
                                 SetChannelTopic
                                   { name = "tm-design",
@@ -52,7 +53,7 @@ spec = do
                                   }
                             ]
                           ),
-                          ( Set.fromList ["U111ALICE", "U22222BOB", "U333CAROL", "U4444DAVE"],
+                          ( Set.fromList ["alice@example.com", "bob@example.com", "carol@example.com", "dave@example.com"],
                             [ Slack
                                 SetGroup
                                   { handle = "design-team",
@@ -61,7 +62,7 @@ spec = do
                                   }
                             ]
                           ),
-                          ( Set.fromList ["U55555EVE", "U77777GIL"],
+                          ( Set.fromList ["eve@example.com", "gil@example.com"],
                             [ Slack
                                 SetChannelTopic
                                   { name = "tm-dev",
@@ -75,7 +76,7 @@ spec = do
                                   }
                             ]
                           ),
-                          ( Set.fromList ["U55555EVE", "U6666FAYE", "U77777GIL", "U88888HAL"],
+                          ( Set.fromList ["eve@example.com", "faye@example.com", "gil@example.com", "hal@example.com"],
                             [ Slack
                                 SetGroup
                                   { handle = "dev-team",
@@ -103,7 +104,9 @@ parseConfList = runM . runConfig . Config.parse
 
 mockRunUser :: Member (Error Text) r => InterpreterFor Users r
 mockRunUser = interpret \case
-  U.Find id -> return $ Just $ User {_id = id, _displayName = "@" <> id}
+  U.Find email -> return $ Just $ User {_id = id, _displayName = "@" <> id, _email = email}
+    where
+      id = T.takeWhile (/= '@') email
   U.ListAll -> throw "Unexpected User.listAll call"
 
 readmeText :: IO Text

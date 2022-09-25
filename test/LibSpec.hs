@@ -29,7 +29,7 @@ import qualified Slack.Channel as C (Channels (Create, Find))
 import Slack.Group (Group (..), Groups (..))
 import qualified Slack.Group as G (Groups (Create, Find))
 import Slack.User (User (..), Users (..))
-import qualified Slack.User as U (Users (Find, ListAll), id)
+import qualified Slack.User as U (Users (Find, ListAll), email)
 import Test.Hspec
   ( Spec,
     describe,
@@ -56,8 +56,8 @@ spec = do
     it "pretty prints the user IDs and display names" $ do
       listUsers
         & runListUsersConst
-          [ User {_id = "id1", _displayName = "@name1"},
-            User {_id = "id2", _displayName = "@name2"}
+          [ User {_id = "id1", _displayName = "@name1", _email = "user1@example.com"},
+            User {_id = "id2", _displayName = "@name2", _email = "user2@example.com"}
           ]
         & runLogToList
         & run
@@ -71,12 +71,12 @@ spec = do
           )
 
   describe "dryRunEnsure" $ do
-    it "returns an error if a configured user ID does not exist" $ do
+    it "returns an error if a configured user email does not exist" $ do
       time <- iso8601ParseM "2021-10-10T00:00:00Z"
       dryRunEnsure "ignored"
         & runConfigConst
           [ Conf
-              { rotation = Weekly [["user_id"]],
+              { rotation = Weekly [["missing@example.com"]],
                 effects =
                   [ Slack
                       SetGroup
@@ -103,7 +103,7 @@ spec = do
                   LogMessage Info "Resolving rotation effects ..",
                   LogMessage Info "Showing resolved rotation effects .."
                 ],
-                Left "Could not find user with ID: user_id"
+                Left "Could not find user with email: missing@example.com"
               )
           )
 
@@ -112,7 +112,7 @@ spec = do
       dryRunEnsure "ignored"
         & runConfigConst
           [ Conf
-              { rotation = Weekly [["1111ALICE", "222222BOB"]],
+              { rotation = Weekly [["alice@example.com", "bob@example.com"]],
                 effects =
                   [ Slack
                       SetGroup
@@ -128,7 +128,7 @@ spec = do
                   ]
               },
             Conf
-              { rotation = Const ["1111ALICE", "222222BOB", "3CAROLINE"],
+              { rotation = Const ["alice@example.com", "bob@example.com", "caroline@example.com"],
                 effects =
                   [ Slack
                       SetGroup
@@ -141,9 +141,9 @@ spec = do
           ]
         & runTimeConst time
         & runListUsersConst
-          [ User {_id = "1111ALICE", _displayName = "Alice"},
-            User {_id = "222222BOB", _displayName = "Bob"},
-            User {_id = "3CAROLINE", _displayName = "Caroline"}
+          [ User {_id = "1111ALICE", _displayName = "Alice", _email = "alice@example.com"},
+            User {_id = "222222BOB", _displayName = "Bob", _email = "bob@example.com"},
+            User {_id = "3CAROLINE", _displayName = "Caroline", _email = "caroline@example.com"}
           ]
         & runError
         & runLogToList
@@ -156,11 +156,11 @@ spec = do
                 ],
                 Right
                   [trimming|
-                    For 1111ALICE:
+                    For alice@example.com:
                       Slack.SetGroup: @team-caretaker {name = "Team team caretaker(s)", channels = []}
                       Slack.SetChannelTopic #tm-team: topic
 
-                    For 1111ALICE, 222222BOB, 3CAROLINE:
+                    For alice@example.com, bob@example.com, caroline@example.com:
                       Slack.SetGroup: @team-team {name = "Team team", channels = ["tm-team"]}
                   |]
               )
@@ -172,7 +172,7 @@ spec = do
       ensure "ignored"
         & runConfigConst
           [ Conf
-              { rotation = Weekly [["alice", "bob"]],
+              { rotation = Weekly [["alice@example.com", "bob@example.com"]],
                 effects =
                   [ Slack
                       SetGroup
@@ -188,7 +188,7 @@ spec = do
                   ]
               },
             Conf
-              { rotation = Const ["alice", "bob", "caroline"],
+              { rotation = Const ["alice@example.com", "bob@example.com", "caroline@example.com"],
                 effects =
                   [ Slack
                       SetGroup
@@ -201,9 +201,9 @@ spec = do
           ]
         & runTimeConst time
         & runListUsersConst
-          [ User {_id = "alice", _displayName = "Alice"},
-            User {_id = "bob", _displayName = "Bob"},
-            User {_id = "caroline", _displayName = "Caroline"}
+          [ User {_id = "1111ALICE", _displayName = "Alice", _email = "alice@example.com"},
+            User {_id = "222222BOB", _displayName = "Bob", _email = "bob@example.com"},
+            User {_id = "3CAROLINE", _displayName = "Caroline", _email = "caroline@example.com"}
           ]
         & runChannels Map.empty
         & runGroups Map.empty
@@ -216,21 +216,21 @@ spec = do
                   LogMessage Info "Resolving rotation effects ..",
                   LogMessage Info "Applying all configurations ..",
                   LogMessage Info "Applying all effects for a rotation ..",
-                  LogMessage Info "Applying to member IDs fromList [\"alice\"] the effect Slack (SetGroup {handle = \"design-caretaker\", name = \"Team design caretaker(s)\", channels = []}) ..",
+                  LogMessage Info "Applying to members fromList [\"alice@example.com\"] the effect Slack (SetGroup {handle = \"design-caretaker\", name = \"Team design caretaker(s)\", channels = []}) ..",
                   LogMessage Info "Finding or creating the following channels: [] ..",
                   LogMessage Info "Finding or creating the group @design-caretaker ..",
-                  LogMessage Info "Updating group members if changed from fromList [] to fromList [\"alice\"] ..",
+                  LogMessage Info "Updating group members if changed from fromList [] to fromList [\"alice@example.com\"] ..",
                   LogMessage Info "Updating default channel IDs if changed from [] to [] ..",
                   LogMessage Info "Finished applying effect Slack (SetGroup {handle = \"design-caretaker\", name = \"Team design caretaker(s)\", channels = []})",
-                  LogMessage Info "Applying to member IDs fromList [\"alice\"] the effect Slack (SetChannelTopic {name = \"tm-design\", topic = \"Caretaker is: input 1, input 2, ..\"}) ..",
+                  LogMessage Info "Applying to members fromList [\"alice@example.com\"] the effect Slack (SetChannelTopic {name = \"tm-design\", topic = \"Caretaker is: input 1, input 2, ..\"}) ..",
                   LogMessage Info "Finding or creating channel #tm-design ..",
                   LogMessage Info "Updating topic if changed from \"\" to \"Caretaker is: Alice\" ..",
                   LogMessage Info "Finished applying effect Slack (SetChannelTopic {name = \"tm-design\", topic = \"Caretaker is: input 1, input 2, ..\"})",
                   LogMessage Info "Applying all effects for a rotation ..",
-                  LogMessage Info "Applying to member IDs fromList [\"alice\",\"bob\",\"caroline\"] the effect Slack (SetGroup {handle = \"design-team\", name = \"Team design\", channels = [\"tm-design\"]}) ..",
+                  LogMessage Info "Applying to members fromList [\"alice@example.com\",\"bob@example.com\",\"caroline@example.com\"] the effect Slack (SetGroup {handle = \"design-team\", name = \"Team design\", channels = [\"tm-design\"]}) ..",
                   LogMessage Info "Finding or creating the following channels: [\"tm-design\"] ..",
                   LogMessage Info "Finding or creating the group @design-team ..",
-                  LogMessage Info "Updating group members if changed from fromList [] to fromList [\"alice\",\"bob\",\"caroline\"] ..",
+                  LogMessage Info "Updating group members if changed from fromList [] to fromList [\"alice@example.com\",\"bob@example.com\",\"caroline@example.com\"] ..",
                   LogMessage Info "Updating default channel IDs if changed from [\"id_tm-design\"] to [\"id_tm-design\"] ..",
                   LogMessage Info "Finished applying effect Slack (SetGroup {handle = \"design-team\", name = \"Team design\", channels = [\"tm-design\"]})",
                   LogMessage Info "Completed applying all configurations"
@@ -244,7 +244,7 @@ spec = do
                                 _name = "Team design caretaker(s)",
                                 _channelIDs = []
                               },
-                            ["alice"]
+                            ["1111ALICE"]
                           )
                         ),
                         ( "id_design-team",
@@ -254,7 +254,7 @@ spec = do
                                 _name = "Team design",
                                 _channelIDs = ["id_tm-design"]
                               },
-                            ["alice", "bob", "caroline"]
+                            ["1111ALICE", "222222BOB", "3CAROLINE"]
                           )
                         )
                       ],
@@ -278,7 +278,7 @@ spec = do
       ensure "ignored"
         & runConfigConst
           [ Conf
-              { rotation = Const ["user-name"],
+              { rotation = Const ["user@example.com"],
                 effects =
                   [ Slack
                       SetGroup
@@ -297,7 +297,7 @@ spec = do
           ]
         & runTimeConst time
         & runListUsersConst
-          [User {_id = "user-name", _displayName = "user-display-name"}]
+          [User {_id = "user-id", _displayName = "user-display-name", _email = "user@example.com"}]
         & runChannels Map.empty
         & runGroups Map.empty
         & runError
@@ -313,7 +313,7 @@ spec = do
                               _name = "group-name",
                               _channelIDs = ["id_channel-name"]
                             },
-                          ["user-name"]
+                          ["user-id"]
                         )
                       ),
                       ( "id_second-group-handle",
@@ -323,7 +323,7 @@ spec = do
                               _name = "second-group-name",
                               _channelIDs = ["id_channel-name"]
                             },
-                          ["user-name"]
+                          ["user-id"]
                         )
                       )
                     ],
@@ -426,7 +426,7 @@ runTimeConst time = interpret \case
 
 runListUsersConst :: [User] -> InterpreterFor Users r
 runListUsersConst users = interpret \case
-  U.Find idToFind -> return $ find ((== idToFind) . (^. U.id)) users
+  U.Find emailToFind -> return $ find ((== emailToFind) . (^. U.email)) users
   U.ListAll -> return users
 
 runLogToList :: Sem (Log ': Output LogMessage ': r) a -> Sem r ([LogMessage], a)

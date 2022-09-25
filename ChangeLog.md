@@ -11,6 +11,8 @@
 * Added logging. The program now outputs logs to stderr. Users who were
   previously using the programs entire output (stdout + stderr), should now
   distinguish between stdout and stderr.
+* The configuration now uses emails instead of Slack IDs for identifying users.
+  This allows referring to the same user across different systems.
 
 ## v0.5.0
 

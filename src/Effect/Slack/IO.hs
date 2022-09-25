@@ -1,15 +1,18 @@
 module Effect.Slack.IO
-  ( apply
+  ( apply,
+    showDryRun,
   )
 where
 
 import Control.Lens ((^.))
 import Control.Monad (unless)
+import Data.Function ((&))
 import Data.Functor ((<&>))
 import Data.List ((\\))
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Text (Text, filter, pack)
+import Effect.Slack (SlackEffect (..))
 import Polysemy (Member, Members, Sem)
 import Polysemy.Error (Error, note)
 import Polysemy.Log (Log)
@@ -41,7 +44,6 @@ import qualified Slack.User as Users (find)
 import Text.Printf (printf)
 import Text.Show.Functions ()
 import Prelude hiding (filter, unlines)
-import Effect.Slack (SlackEffect (..))
 
 apply ::
   ( Member (Error Text) r,
@@ -86,6 +88,23 @@ apply members = \case
       same oldTopic newTopic = oldTopic == newTopic || clean oldTopic == clean newTopic
       clean = filter (not . potentialAddedChar)
       potentialAddedChar c = c `elem` ['<', '>']
+
+showDryRun ::
+  ( Member (Error Text) r,
+    Member Users r
+  ) =>
+  Set Text ->
+  SlackEffect ->
+  Sem r Text
+showDryRun members = fmap (pack . ("Slack." <>)) . \case
+  SetChannelTopic {name, topic} ->
+    members
+      & Set.toList
+      & traverse getDisplayName
+      <&> topic
+      <&> printf "SetChannelTopic #%s: %s" name
+  SetGroup {handle, name, channels} ->
+    return $ printf "SetGroup: @%s {name = \"%s\", channels = %s}" handle name (show channels)
 
 getDisplayName :: Members '[Users, Error Text] r => Text -> Sem r Text
 getDisplayName id =

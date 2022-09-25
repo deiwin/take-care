@@ -14,7 +14,10 @@ import Data.Text.IO (readFile)
 import Data.Time.Format.ISO8601 (iso8601ParseM)
 import Effect (Effect (..))
 import Effect.Slack (SlackEffect (..))
-import Polysemy (runM)
+import Polysemy (InterpreterFor, Member, interpret, run, runM)
+import Polysemy.Error (Error, runError, throw)
+import Slack.User (User (..), Users)
+import qualified Slack.User as U (Users (Find, ListAll))
 import Test.Hspec
   ( Spec,
     it,
@@ -89,13 +92,19 @@ spec = do
     let resolvedRotationEffectsList = currentResolvedRotationEffects time <$> confList
 
     result <- dryRunExample
-    showResolvedRotationEffectsList mockGetDisplayName resolvedRotationEffectsList `shouldBe` Just result
+    showResolvedRotationEffectsList resolvedRotationEffectsList
+      & mockRunUser
+      & runError
+      & run
+      & (`shouldBe` Right result)
 
 parseConfList :: Text -> IO [Conf]
 parseConfList = runM . runConfig . Config.parse
 
-mockGetDisplayName :: Text -> Maybe Text
-mockGetDisplayName = Just . ("@" <>)
+mockRunUser :: Member (Error Text) r => InterpreterFor Users r
+mockRunUser = interpret \case
+  U.Find id -> return $ Just $ User {_id = id, _displayName = "@" <> id}
+  U.ListAll -> throw "Unexpected User.listAll call"
 
 readmeText :: IO Text
 readmeText = readBlock "haskell" <$> readFile "README.md"

@@ -112,7 +112,7 @@ spec = do
       dryRunEnsure "ignored"
         & runConfigConst
           [ Conf
-              { rotation = Weekly [["alice", "bob"]],
+              { rotation = Weekly [["1111ALICE", "222222BOB"]],
                 effects =
                   [ Slack
                       SetGroup
@@ -128,7 +128,7 @@ spec = do
                   ]
               },
             Conf
-              { rotation = Const ["alice", "bob", "caroline"],
+              { rotation = Const ["1111ALICE", "222222BOB", "3CAROLINE"],
                 effects =
                   [ Slack
                       SetGroup
@@ -141,9 +141,9 @@ spec = do
           ]
         & runTimeConst time
         & runListUsersConst
-          [ User {_id = "alice", _displayName = "Alice"},
-            User {_id = "bob", _displayName = "Bob"},
-            User {_id = "caroline", _displayName = "Caroline"}
+          [ User {_id = "1111ALICE", _displayName = "Alice"},
+            User {_id = "222222BOB", _displayName = "Bob"},
+            User {_id = "3CAROLINE", _displayName = "Caroline"}
           ]
         & runError
         & runLogToList
@@ -156,11 +156,11 @@ spec = do
                 ],
                 Right
                   [trimming|
-                    For Alice:
+                    For 1111ALICE:
                       Slack.SetGroup: @team-caretaker {name = "Team team caretaker(s)", channels = []}
                       Slack.SetChannelTopic #tm-team: topic
 
-                    For Alice, Bob, Caroline:
+                    For 1111ALICE, 222222BOB, 3CAROLINE:
                       Slack.SetGroup: @team-team {name = "Team team", channels = ["tm-team"]}
                   |]
               )

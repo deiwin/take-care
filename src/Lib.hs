@@ -18,7 +18,6 @@ import qualified Config (parse)
 import Control.Category ((>>>))
 import Control.Lens ((^.))
 import Data.Foldable (traverse_)
-import Data.Functor ((<&>))
 import Data.Set (Set)
 import Data.Text (Text, pack, unlines)
 import Data.Time.Clock (UTCTime)
@@ -29,7 +28,7 @@ import qualified IO as Time (getCurrent)
 import Log (runLog)
 import qualified Log as Log' (Effects)
 import Polysemy (Embed, Final, Member, Members, Sem, embedToFinal, runFinal)
-import Polysemy.Error (Error, errorToIOFinal, note)
+import Polysemy.Error (Error, errorToIOFinal)
 import Polysemy.Input (Input)
 import Polysemy.Log (Log)
 import qualified Polysemy.Log as Log (info)
@@ -49,7 +48,7 @@ import Slack.User as User
     runUsers,
   )
 import qualified Slack.User as User (Effects)
-import qualified Slack.User as Users (find, listAll)
+import qualified Slack.User as Users (listAll)
 import Slack.Util (NetCtx, Slack, runNetCtx, runSlack)
 import Text.Printf (printf)
 import Text.Show.Functions ()
@@ -129,7 +128,7 @@ dryRunEnsure inputText = do
   Log.info "Resolving rotation effects .."
   let resolvedRotationEffectsList = currentResolvedRotationEffects time <$> confList
   Log.info "Showing resolved rotation effects .."
-  showResolvedRotationEffectsList getDisplayName resolvedRotationEffectsList
+  showResolvedRotationEffectsList resolvedRotationEffectsList
 
 listUsers :: Members '[Users, Log] r => Sem r Text
 listUsers = do
@@ -179,9 +178,3 @@ applyEffect members = withLog \case
       result <- f effect
       Log.info (pack (printf "Finished applying effect %s" (show effect)))
       return result
-
-getDisplayName :: Members '[Users, Error Text] r => Text -> Sem r Text
-getDisplayName id =
-  Users.find id
-    >>= note (pack (printf "Could not find user with ID: %s" id))
-    <&> (^. User.displayName)

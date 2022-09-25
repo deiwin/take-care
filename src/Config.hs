@@ -27,9 +27,11 @@ import Dhall (FromDhall)
 import qualified Dhall (auto, input)
 import Dhall.TH (HaskellType (..), makeHaskellTypes)
 import Effect (Effect (..))
-import Effect.Slack (SlackEffect (..))
+import qualified Effect.Slack.IO as Slack (showDryRun)
 import GHC.Generics (Generic)
-import Polysemy (Embed, InterpreterFor, Member, embed, interpret, makeSem)
+import Polysemy (Embed, InterpreterFor, Member, Sem, embed, interpret, makeSem)
+import Polysemy.Error (Error)
+import Slack.User as User (Users)
 import Text.Printf (printf)
 import Prelude hiding (lines, replicate)
 
@@ -56,36 +58,37 @@ runConfig :: Member (Embed IO) r => InterpreterFor Config r
 runConfig = interpret \case
   Parse input -> embed $ Dhall.input Dhall.auto input
 
-showResolvedRotationEffectsList :: forall m. (Monad m) => (Text -> m Text) -> [ResolvedRotationEffects] -> m Text
-showResolvedRotationEffectsList getDisplayName resolvedRotationEffectsList =
+showResolvedRotationEffectsList ::
+  ( Member (Error Text) r,
+    Member Users r
+  ) =>
+  [ResolvedRotationEffects] ->
+  Sem r Text
+showResolvedRotationEffectsList resolvedRotationEffectsList =
   resolvedRotationEffectsList
-    & traverse (showResolvedRotationEffects getDisplayName)
+    & traverse showResolvedRotationEffects
     <&> intercalate "\n\n"
 
-showResolvedRotationEffects :: forall m. (Monad m) => (Text -> m Text) -> ResolvedRotationEffects -> m Text
-showResolvedRotationEffects getDisplayName (members, effects) = interUnlines <$> sequence lines
+showResolvedRotationEffects ::
+  ( Member (Error Text) r,
+    Member Users r
+  ) =>
+  ResolvedRotationEffects ->
+  Sem r Text
+showResolvedRotationEffects (members, effects) = interUnlines <$> sequence lines
   where
     lines = memberLine : effectLines
     memberLine =
       members
         & Set.toList
-        & traverse getDisplayName
-        <&> intercalate ", "
-        <&> printf "For %s:"
-        <&> pack
-    effectLines = padLeft 2 . pack <<$>> showEffect <$> effects
+        & intercalate ", "
+        & printf "For %s:"
+        & pack
+        & return
+    effectLines = padLeft 2 <<$>> showEffect <$> effects
     showEffect = \case
       NoOp -> return "NoOp"
-      Slack effect ->
-        ("Slack." <>) <$> case effect of
-          SetChannelTopic {name, topic} ->
-            members
-              & Set.toList
-              & traverse getDisplayName
-              <&> topic
-              <&> printf "SetChannelTopic #%s: %s" name
-          SetGroup {handle, name, channels} ->
-            return $ printf "SetGroup: @%s {name = \"%s\", channels = %s}" handle name (show channels)
+      Slack effect -> Slack.showDryRun members effect
 
 padLeft :: Int -> Text -> Text
 padLeft spaces = fmapLines (prefix <>)

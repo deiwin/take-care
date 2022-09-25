@@ -154,18 +154,18 @@ command.
 
 ```dryRunExample
 $ docker run --rm -i -e "API_TOKEN=$API_TOKEN" deiwin/take-care:latest ensure --dry-run < teams.dhall
-For @U22222BOB:
+For U22222BOB:
   Slack.SetChannelTopic #tm-design: Stand-up *9:30* :paw_prints: Board :incoming_envelope: https://team.board/url :paw_prints: Caretaker @U22222BOB
   Slack.SetGroup: @design-caretaker {name = "Team design caretaker(s)", channels = []}
 
-For @U111ALICE, @U22222BOB, @U333CAROL, @U4444DAVE:
+For U111ALICE, U22222BOB, U333CAROL, U4444DAVE:
   Slack.SetGroup: @design-team {name = "Team design", channels = ["tm-design"]}
 
-For @U55555EVE, @U77777GIL:
+For U55555EVE, U77777GIL:
   Slack.SetChannelTopic #tm-dev: @U55555EVE, @U77777GIL are the caretakers
   Slack.SetGroup: @dev-caretaker {name = "Team dev caretaker(s)", channels = []}
 
-For @U55555EVE, @U6666FAYE, @U77777GIL, @U88888HAL:
+For U55555EVE, U6666FAYE, U77777GIL, U88888HAL:
   Slack.SetGroup: @dev-team {name = "Team dev", channels = ["tm-dev"]}
 ```
 

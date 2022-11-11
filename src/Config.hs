@@ -43,7 +43,7 @@ import Text.Show.Functions ()
 import Prelude hiding (filter, lines, replicate, unlines)
 
 Dhall.TH.makeHaskellTypes
-  [ MultipleConstructors "Rotation" "./src/Rotation.dhall"
+  [ MultipleConstructors "Rotation" "./types/core/Rotation.dhall"
   ]
 
 data Conf = Conf

@@ -63,15 +63,15 @@ according to your needs. The configuration is written in [Dhall][3],
 a programmable configuration language with Haskell-like syntax.
 
 ```haskell
-let SlackEffect = ./src/Effect/Slack.dhall
+let SlackEffect = ./types/core/Effect/Slack.dhall
 let SetGroup = SlackEffect.SetGroup
 let SetChannelTopic = SlackEffect.SetChannelTopic
 
-let Effect = ./src/Effect.dhall
+let Effect = ./types/core/Effect.dhall
 let Slack = Effect.Slack
 
-let Rotation = ./src/Rotation.dhall
-let Conf = ./src/Conf.dhall
+let Rotation = ./types/core/Rotation.dhall
+let Conf = ./types/core/Conf.dhall
 
 let concat = https://raw.githubusercontent.com/dhall-lang/dhall-lang/v21.1.0/Prelude/List/concat.dhall
 let concatMap = https://raw.githubusercontent.com/dhall-lang/dhall-lang/v21.1.0/Prelude/List/concatMap.dhall

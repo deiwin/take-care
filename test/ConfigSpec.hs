@@ -28,8 +28,8 @@ spec = do
     confList <-
       parseConfList
         [trimming|
-          let Effect = ./src/Effect.dhall
-          let Rotation = ./src/Rotation.dhall
+          let Effect = ./types/core/Effect.dhall
+          let Rotation = ./types/core/Rotation.dhall
            in [ { rotation = Rotation.Const ["whatever"]
                 , effects = [] : List Effect
                 }
@@ -48,9 +48,9 @@ spec = do
     confList <-
       parseConfList
         [trimming|
-          let SlackEffect = ./src/Effect/Slack.dhall
-          let Effect = ./src/Effect.dhall
-          let Rotation = ./src/Rotation.dhall
+          let SlackEffect = ./types/core/Effect/Slack.dhall
+          let Effect = ./types/core/Effect.dhall
+          let Rotation = ./types/core/Rotation.dhall
            in [ { rotation = Rotation.Const ["user-id"]
                 , effects = [ Effect.Slack (SlackEffect.SetGroup
                                 { handle = "group-handle"
@@ -80,9 +80,9 @@ spec = do
     confList <-
       parseConfList
         [trimming|
-          let SlackEffect = ./src/Effect/Slack.dhall
-          let Effect = ./src/Effect.dhall
-          let Rotation = ./src/Rotation.dhall
+          let SlackEffect = ./types/core/Effect/Slack.dhall
+          let Effect = ./types/core/Effect.dhall
+          let Rotation = ./types/core/Rotation.dhall
            in [ { rotation = Rotation.Weekly [["user-id-one", "user-id-two"]]
                 , effects = [ Effect.Slack (SlackEffect.SetGroup
                                 { handle = "group-handle"

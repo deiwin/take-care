@@ -1,5 +1,7 @@
 FROM fpco/stack-build:lts-19.22 as builder
 
+WORKDIR /app
+
 ADD stack.yaml package.yaml ./
 RUN stack -j "$(nproc)" --system-ghc build --only-dependencies
 
@@ -23,6 +25,8 @@ RUN apt-get update && apt-get install -y \
     libtinfo5 \
     netbase \
  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
 
 COPY --from=builder /root/.local/bin/take-care /usr/local/bin/
 

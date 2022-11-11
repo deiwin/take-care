@@ -13,6 +13,9 @@
   distinguish between stdout and stderr.
 * The configuration now uses emails instead of Slack IDs for identifying users.
   This allows referring to the same user across different systems.
+* The Dhall types that make up the new, flexible configuration interface (API)
+  of the application are now available in the `./types/core` of the repository
+  and the available Docker images.
 
 ## v0.5.0
 

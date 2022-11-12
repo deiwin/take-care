@@ -64,6 +64,7 @@ a programmable configuration language with Haskell-like syntax.
 
 ```haskell
 let teams = ./types/zoo/teams.dhall
+          ? https://github.com/deiwin/take-care/raw/v0.6.0/types/zoo/teams.dhall
  in teams
       [ { members =
           { caretakers = [ [ "alice@example.com", "bob@example.com", "carol@example.com" ] ]

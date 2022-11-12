@@ -163,6 +163,38 @@ spec = do
               )
           )
 
+    it "ignores users without the email field" $ do
+      Users.listAll
+        & runGetPaginatedConst
+          [ [trimming|
+              {
+                "members": [{
+                  "id": "id",
+                  "name": "name",
+                  "profile": {
+                    "display_name": "display_name"
+                  },
+                  "is_bot": true
+                }, {
+                  "id": "id2",
+                  "name": "name2",
+                  "profile": {
+                    "display_name": "display_name2",
+                    "email": "name2@example.com"
+                  },
+                  "is_bot": false
+                }]
+              }
+            |]
+          ]
+        & ( `shouldBe`
+              ( [ LogMessage Info "Listing all users ..",
+                  LogMessage Info "Building user cache .."
+                ],
+                Right [User {_id = "id2", _displayName = "@display_name2", _email = "name2@example.com"}]
+              )
+          )
+
     it "returns a User object from the second page" $ do
       Users.listAll
         & runGetPaginatedConst

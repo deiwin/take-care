@@ -11,10 +11,11 @@ module Slack.User
   )
 where
 
-import Control.Lens ((&), (^.), (^..), (^?))
+import Control.Applicative (liftA2)
+import Control.Lens (has, (&), (^.), (^..), (^?))
 import Control.Lens.TH (makeLenses)
 import Data.Aeson (FromJSON (parseJSON), withObject, (.:), (.:?))
-import Data.Aeson.Lens (key, values)
+import Data.Aeson.Lens (key, values, _Object)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
@@ -105,4 +106,12 @@ listAllUsers = do
       & note "\"users.list\" response didn't include a \"members\" field"
   memberBodies
     & concatMap (^.. values)
+    & filter (not . profileWithoutEmail)
     & traverse fromJSON
+  where
+    profileWithoutEmail =
+      has (key "profile" . _Object)
+        <&&> (not . has (key "profile" . key "email"))
+
+(<&&>) :: Applicative f => f Bool -> f Bool -> f Bool
+(<&&>) = liftA2 (&&)

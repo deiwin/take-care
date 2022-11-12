@@ -16,6 +16,11 @@
 * The Dhall types that make up the new, flexible configuration interface (API)
   of the application are now available in the `./types/core` of the repository
   and the available Docker images.
+* There's also a folder `./types/zoo` for reusable Dhall functions that build
+  on top of the main, flexible API. For example, the previous interface is
+  still usable through the `teams` Dhall function provided by
+  `./types/zoo/teams.dhall` (with the small change of the `team` key being
+  renamed to `name`).
 
 ## v0.5.0
 

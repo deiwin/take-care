@@ -65,8 +65,8 @@ spec = do
               ( [ LogMessage Info "Fetching all users ..",
                   LogMessage Info "Finished fetching all users"
                 ],
-                "id1: @name1\n\
-                \id2: @name2\n"
+                "user1@example.com: @name1\n\
+                \user2@example.com: @name2\n"
               )
           )
 

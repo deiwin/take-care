@@ -30,7 +30,7 @@ import qualified Polysemy.Log as Log (info)
 import Slack.Channel as Channel (Channels, runChannels)
 import qualified Slack.Channel as Channel (Effects)
 import Slack.Group as Group (Groups, runGroups)
-import Slack.User as User (Users, displayName, id, runUsers)
+import Slack.User as User (Users, displayName, email, runUsers)
 import qualified Slack.User as User (Effects)
 import qualified Slack.User as Users (listAll)
 import Slack.Util (NetCtx, Slack, runNetCtx, runSlack)
@@ -123,4 +123,4 @@ listUsers = do
   Log.info "Finished fetching all users"
   return $ unlines (formatLine <$> users)
   where
-    formatLine user = pack $ printf "%s: %s" (user ^. User.id) (user ^. displayName)
+    formatLine user = pack $ printf "%s: %s" (user ^. email) (user ^. displayName)

@@ -99,7 +99,10 @@ runUsers = evalState (False, Map.empty) . interpretWithCache
 listAllUsers :: Members '[Slack, Error Text] r => Sem r [User]
 listAllUsers = do
   respBodies <- Slack.getPaginated defaults "users.list"
-  vals <-
-    concatMap (^.. values)
-      <$> (traverse (^? key "members") respBodies & note "\"users.list\" response didn't include a \"members\" field")
-  traverse fromJSON vals
+  memberBodies <-
+    respBodies
+      & traverse (^? key "members")
+      & note "\"users.list\" response didn't include a \"members\" field"
+  memberBodies
+    & concatMap (^.. values)
+    & traverse fromJSON

@@ -29,6 +29,6 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 COPY --from=builder /root/.local/bin/take-care /usr/local/bin/
-COPY --from=builder ./types ./types
+COPY --from=builder /app/types /app/types
 
 ENTRYPOINT ["/usr/local/bin/take-care"]

@@ -2,6 +2,8 @@
 
 ## Unreleased changes
 
+## v0.6.0
+
 * Redesign configuration interface to be more flexible. Previously the
   configuration had specific constraints on Slack channel naming patterns etc.
   This is no longer the case. The old behavior is still expressable with the

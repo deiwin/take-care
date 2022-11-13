@@ -2,6 +2,11 @@
 
 ## Unreleased changes
 
+* Freeze and cache in the Docker image the dependencies used in the type zoo
+  (e.g. `types/zoo/teams.dhall`). This way the Dhall prelude functions used
+  within those files don't need to be downloaded when the files are used during
+  runtime.
+
 ## v0.6.0
 
 * Redesign configuration interface to be more flexible. Previously the

@@ -8,6 +8,9 @@ RUN stack -j "$(nproc)" --system-ghc build --only-dependencies
 ADD ./ ./
 RUN stack -j "$(nproc)" --system-ghc build --copy-bins
 
+RUN stack install dhall \
+  && dhall freeze --check types/zoo/**/*
+
 FROM builder as test
 
 RUN stack test \
@@ -30,5 +33,7 @@ WORKDIR /app
 
 COPY --from=builder /root/.local/bin/take-care /usr/local/bin/
 COPY --from=builder /app/types /app/types
+COPY --from=builder /root/.cache/dhall /root/.cache/dhall
+COPY --from=builder /root/.cache/dhall-haskell /root/.cache/dhall-haskell
 
 ENTRYPOINT ["/usr/local/bin/take-care"]

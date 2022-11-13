@@ -9,7 +9,7 @@ ADD ./ ./
 RUN stack -j "$(nproc)" --system-ghc build --copy-bins
 
 RUN stack install dhall \
-  && find types/zoo -type f -name '*.dhall' | xargs dhall freeze --check
+  && find types/zoo -type f -name '*.dhall' | xargs dhall freeze --check \
   && find types/zoo -type f -name '*.dhall' | xargs -n 1 dhall resolve --file > /dev/null
 
 FROM builder as test

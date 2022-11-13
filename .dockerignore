@@ -4,3 +4,4 @@ take-care.cabal
 .git/
 tags
 Dockerfile
+scripts/

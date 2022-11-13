@@ -35,9 +35,7 @@ let team =
         let channelName = "tm-${args.name}"
 
         let allMembers =
-              concat
-                Text
-                [ concat Text args.members.caretakers, args.members.others ]
+              concat Text args.members.caretakers # args.members.others
 
         in    [ { rotation = Rotation.Weekly args.members.caretakers
                 , effects =

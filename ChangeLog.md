@@ -2,6 +2,8 @@
 
 ## Unreleased changes
 
+* Fix caching in Docker builds.
+
 ## v0.6.1
 
 * Freeze and cache in the Docker image the dependencies used in the type zoo

@@ -2,6 +2,8 @@
 
 ## Unreleased changes
 
+## v0.6.2
+
 * Fix caching in Docker builds.
 
 ## v0.6.1

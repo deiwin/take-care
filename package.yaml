@@ -19,6 +19,8 @@ extra-source-files:
 # common to point users to the README.md file.
 description:         Please see the README on GitHub at <https://github.com/deiwin/take-care#readme>
 
+language: GHC2021
+
 dependencies:
 - base >= 4.7 && < 5
 - polysemy
@@ -40,24 +42,15 @@ ghc-options:
 - -flate-specialise
 - -fspecialise-aggressively
 default-extensions:
-- BangPatterns
 - BlockArguments
 - DataKinds
-- DeriveGeneric
-- FlexibleContexts
 - GADTs
 - LambdaCase
 - OverloadedStrings
-- PolyKinds
-- RankNTypes
 - RecordWildCards
-- ScopedTypeVariables
 - TemplateHaskell
-- TypeApplications
 - TypeFamilies
-- TypeOperators
 - DuplicateRecordFields
-- NamedFieldPuns
 
 library:
   source-dirs: src

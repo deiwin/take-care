@@ -1,4 +1,4 @@
-FROM fpco/stack-build:lts-19.22 as builder
+FROM fpco/stack-build:lts-20.2 as builder
 
 WORKDIR /app
 

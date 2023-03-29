@@ -48,7 +48,7 @@ packages:
     hackage: polysemy-resume-0.5.0.0@sha256:4ad4c539d312aaa432315a15fdc051577e850a95ad67f94bb5d54656b06fad93,4840
 snapshots:
 - completed:
-    sha256: fc39d8afc97531d53d87b10abdef593bce503c0c1e46c2e9a84ebcbc78bf8470
-    size: 648432
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/20/2.yaml
-  original: lts-20.2
+    sha256: dad15e2ec0c09280a5c2e07190fb18710fc54472f029f34f861f686540824d81
+    size: 649592
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/20/16.yaml
+  original: lts-20.16

@@ -8,13 +8,16 @@ import Config
     runConfig,
   )
 import Config qualified (parse)
+import Data.Function ((&))
 import Data.Set qualified as Set
 import Data.Text (Text)
+import Data.Time.Clock (UTCTime)
 import Data.Time.Format.ISO8601 (iso8601ParseM)
 import Effect (Effect (..))
 import Effect.Slack (SlackEffect (..))
+import IO (Time (..))
 import NeatInterpolation (trimming)
-import Polysemy (runM)
+import Polysemy (InterpreterFor, interpret, run, runM)
 import Test.Hspec
   ( Spec,
     it,
@@ -37,12 +40,15 @@ spec = do
         |]
     time <- iso8601ParseM "2021-10-10T00:00:00Z"
 
-    let resolvedRotationEffectsList = currentResolvedRotationEffects time <$> confList
-    resolvedRotationEffectsList
-      `shouldMatchList` [ ( Set.fromList ["whatever"],
-                            []
-                          )
-                        ]
+    traverse currentResolvedRotationEffects confList
+      & runTimeConst time
+      & run
+      & ( `shouldMatchList`
+            [ ( Set.fromList ["whatever"],
+                []
+              )
+            ]
+        )
 
   it "returns a group with Slack.SetGroup effect" $ do
     confList <-
@@ -63,18 +69,21 @@ spec = do
         |]
     time <- iso8601ParseM "2021-10-10T00:00:00Z"
 
-    let resolvedRotationEffectsList = currentResolvedRotationEffects time <$> confList
-    resolvedRotationEffectsList
-      `shouldMatchList` [ ( Set.fromList ["user-id"],
-                            [ Slack
-                                SetGroup
-                                  { handle = "group-handle",
-                                    name = "group-name",
-                                    channels = ["channel-name"]
-                                  }
-                            ]
-                          )
-                        ]
+    traverse currentResolvedRotationEffects confList
+      & runTimeConst time
+      & run
+      & ( `shouldMatchList`
+            [ ( Set.fromList ["user-id"],
+                [ Slack
+                    SetGroup
+                      { handle = "group-handle",
+                        name = "group-name",
+                        channels = ["channel-name"]
+                      }
+                ]
+              )
+            ]
+        )
 
   it "resolves weekly rotation" $ do
     confList <-
@@ -95,18 +104,25 @@ spec = do
         |]
     time <- iso8601ParseM "2021-10-10T00:00:00Z"
 
-    let resolvedRotationEffectsList = currentResolvedRotationEffects time <$> confList
-    resolvedRotationEffectsList
-      `shouldMatchList` [ ( Set.fromList ["user-id-one"],
-                            [ Slack
-                                SetGroup
-                                  { handle = "group-handle",
-                                    name = "group-name",
-                                    channels = ["channel-name"]
-                                  }
-                            ]
-                          )
-                        ]
+    traverse currentResolvedRotationEffects confList
+      & runTimeConst time
+      & run
+      & ( `shouldMatchList`
+            [ ( Set.fromList ["user-id-one"],
+                [ Slack
+                    SetGroup
+                      { handle = "group-handle",
+                        name = "group-name",
+                        channels = ["channel-name"]
+                      }
+                ]
+              )
+            ]
+        )
+
+runTimeConst :: UTCTime -> InterpreterFor Time r
+runTimeConst time = interpret \case
+  GetCurrent -> return time
 
 parseConfList :: Text -> IO [Conf]
 parseConfList = runM . runConfig . Config.parse

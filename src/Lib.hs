@@ -19,7 +19,6 @@ import Control.Category ((>>>))
 import Control.Lens ((^.))
 import Data.Text (Text, pack, unlines)
 import IO (Env, Time, runEnv, runTime)
-import IO qualified as Time (getCurrent)
 import Log (runLog)
 import Log qualified as Log' (Effects)
 import Polysemy (Embed, Final, Member, Members, Sem, embedToFinal, runFinal)
@@ -89,10 +88,8 @@ ensure ::
 ensure inputText = do
   Log.info "Parsing configuration .."
   confList <- Config.parse inputText
-  Log.info "Resolving current time .."
-  time <- Time.getCurrent
   Log.info "Resolving rotation effects .."
-  let resolvedRotationEffectsList = currentResolvedRotationEffects time <$> confList
+  resolvedRotationEffectsList <- traverse currentResolvedRotationEffects confList
   Log.info "Applying all configurations .."
   apply resolvedRotationEffectsList
   Log.info "Completed applying all configurations"
@@ -109,10 +106,8 @@ dryRunEnsure ::
 dryRunEnsure inputText = do
   Log.info "Parsing configuration .."
   confList <- Config.parse inputText
-  Log.info "Resolving current time .."
-  time <- Time.getCurrent
   Log.info "Resolving rotation effects .."
-  let resolvedRotationEffectsList = currentResolvedRotationEffects time <$> confList
+  resolvedRotationEffectsList <- traverse currentResolvedRotationEffects confList
   Log.info "Showing resolved rotation effects .."
   showDryRun resolvedRotationEffectsList
 

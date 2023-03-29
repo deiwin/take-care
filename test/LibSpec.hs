@@ -99,7 +99,6 @@ spec = do
         & run
         & ( `shouldBe`
               ( [ LogMessage Info "Parsing configuration ..",
-                  LogMessage Info "Resolving current time ..",
                   LogMessage Info "Resolving rotation effects ..",
                   LogMessage Info "Showing resolved rotation effects .."
                 ],
@@ -150,7 +149,6 @@ spec = do
         & run
         & ( `shouldBe`
               ( [ LogMessage Info "Parsing configuration ..",
-                  LogMessage Info "Resolving current time ..",
                   LogMessage Info "Resolving rotation effects ..",
                   LogMessage Info "Showing resolved rotation effects .."
                 ],
@@ -212,7 +210,6 @@ spec = do
         & run
         & ( `shouldBe`
               ( [ LogMessage Info "Parsing configuration ..",
-                  LogMessage Info "Resolving current time ..",
                   LogMessage Info "Resolving rotation effects ..",
                   LogMessage Info "Applying all configurations ..",
                   LogMessage Info "Applying all effects for a rotation ..",

@@ -31,6 +31,8 @@ import Dhall.TH (HaskellType (..), makeHaskellTypes)
 import Effect (Effect (..))
 import Effect qualified (apply, showDryRun)
 import GHC.Generics (Generic)
+import IO (Time)
+import IO qualified as Time (getCurrent)
 import Polysemy (Embed, InterpreterFor, Member, Sem, embed, interpret, makeSem)
 import Polysemy.Error (Error)
 import Polysemy.Log (Log)
@@ -103,15 +105,17 @@ showDryRun resolvedRotationEffectsList =
             & return
         effectLines = padLeft 2 <<$>> Effect.showDryRun members <$> effects
 
-currentResolvedRotationEffects :: UTCTime -> Conf -> ResolvedRotationEffects
-currentResolvedRotationEffects time conf =
-  ( Set.fromList $ resolveRotation $ rotation conf,
-    effects conf
-  )
-  where
-    resolveRotation = \case
-      Weekly membersList -> currentCaretaker time <$> membersList
-      Const members -> members
+currentResolvedRotationEffects :: (Member Time r) => Conf -> Sem r ResolvedRotationEffects
+currentResolvedRotationEffects conf = do
+  userSet <- Set.fromList <$> resolveRotation (rotation conf)
+  return (userSet, effects conf)
+
+resolveRotation :: (Member Time r) => Rotation -> Sem r [Text]
+resolveRotation = \case
+  Weekly membersList -> do
+    time <- Time.getCurrent
+    return $ currentCaretaker time <$> membersList
+  Const members -> return members
 
 currentCaretaker :: UTCTime -> [Text] -> Text
 currentCaretaker time candidates = cycle candidates !! utcWeek

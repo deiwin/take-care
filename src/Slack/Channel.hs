@@ -17,17 +17,17 @@ import Control.Lens.TH (makeLenses)
 import Data.Aeson (FromJSON (parseJSON), withObject, (.:), (.=))
 import Data.Aeson.Lens (key, values)
 import Data.Map (Map)
-import qualified Data.Map as Map
+import Data.Map qualified as Map
 import Data.Text (Text, pack)
 import GHC.Generics (Generic)
 import Network.Wreq (defaults, param)
 import Polysemy (InterpreterFor, InterpretersFor, Member, Members, Sem, interpret, makeSem)
 import Polysemy.Error (Error, note)
 import Polysemy.Log (Log)
-import qualified Polysemy.Log as Log (info)
+import Polysemy.Log qualified as Log (info)
 import Polysemy.State (State, evalState, get, modify, put)
 import Slack.Util (Slack, fromJSON)
-import qualified Slack.Util as Slack (getPaginated, post)
+import Slack.Util qualified as Slack (getPaginated, post)
 import Text.Printf (printf)
 import Prelude hiding (id)
 
@@ -111,7 +111,8 @@ third3 f (a, b, c) = (a, b, f c)
 listAllChannels :: Members '[Slack, Error Text] r => Sem r [Channel]
 listAllChannels = do
   let params =
-        defaults & param "types" .~ ["public_channel,private_channel"]
+        defaults
+          & param "types" .~ ["public_channel,private_channel"]
           & param "exclude_archived" .~ ["true"]
           & param "limit" .~ ["1000"]
   respBodies <- Slack.getPaginated params "conversations.list"

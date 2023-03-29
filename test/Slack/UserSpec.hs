@@ -17,7 +17,7 @@ import Slack.User
     User (..),
     runUsers,
   )
-import qualified Slack.User as Users (find, listAll)
+import Slack.User qualified as Users (find, listAll)
 import Slack.Util (Slack (..))
 import Test.Hspec
   ( Spec,

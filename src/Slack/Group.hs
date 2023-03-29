@@ -19,16 +19,16 @@ import Control.Lens.TH (makeLenses)
 import Data.Aeson (FromJSON (parseJSON), withObject, (.:), (.=))
 import Data.Aeson.Lens (key, values, _String)
 import Data.List (intercalate)
-import qualified Data.List as L (find)
+import Data.List qualified as L (find)
 import Data.Text (Text, pack, unpack)
 import GHC.Generics (Generic)
 import Network.Wreq (defaults, param)
 import Polysemy (InterpreterFor, Member, Members, Sem, interpret, makeSem)
 import Polysemy.Error (Error, note)
 import Polysemy.Log (Log)
-import qualified Polysemy.Log as Log (info)
+import Polysemy.Log qualified as Log (info)
 import Slack.Util (Slack, fromJSON)
-import qualified Slack.Util as Slack (get, post)
+import Slack.Util qualified as Slack (get, post)
 import Text.Printf (printf)
 import Prelude hiding (id)
 
@@ -81,7 +81,8 @@ runGroups = interpret \case
 getGroupMembers :: Member Slack r => Text -> Sem r [Text]
 getGroupMembers groupID = do
   let opts =
-        defaults & param "usergroup" .~ [groupID]
+        defaults
+          & param "usergroup" .~ [groupID]
           & param "include_disabled" .~ ["true"]
   respBody <- Slack.get opts "usergroups.users.list"
   return $ respBody ^.. key "users" . values . _String

@@ -7,8 +7,8 @@ import Config
     currentResolvedRotationEffects,
     runConfig,
   )
-import qualified Config (parse)
-import qualified Data.Set as Set
+import Config qualified (parse)
+import Data.Set qualified as Set
 import Data.Text (Text)
 import Data.Time.Format.ISO8601 (iso8601ParseM)
 import Effect (Effect (..))

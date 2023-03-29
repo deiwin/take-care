@@ -12,7 +12,7 @@ import Slack.Channel
     Effects,
     runChannels,
   )
-import qualified Slack.Channel as Channels (create, find, setTopic)
+import Slack.Channel qualified as Channels (create, find, setTopic)
 import Slack.TestUtils
   ( SlackResponse (..),
     nullSlackMatch,
@@ -22,10 +22,10 @@ import Slack.TestUtils
 import Slack.Util (Slack (..))
 import Test.Hspec
   ( Spec,
+    context,
     describe,
     expectationFailure,
     it,
-    context,
     shouldBe,
     shouldContain,
   )

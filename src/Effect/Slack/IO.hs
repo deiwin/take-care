@@ -10,26 +10,26 @@ import Data.Function ((&))
 import Data.Functor ((<&>))
 import Data.List ((\\))
 import Data.Set (Set)
-import qualified Data.Set as Set
+import Data.Set qualified as Set
 import Data.Text (Text, filter, pack)
 import Effect.Slack (SlackEffect (..))
 import Polysemy (Member, Members, Sem)
 import Polysemy.Error (Error, note)
 import Polysemy.Log (Log)
-import qualified Polysemy.Log as Log (info)
+import Polysemy.Log qualified as Log (info)
 import Slack.Channel as Channel
   ( Channel,
     Channels,
     id,
   )
-import qualified Slack.Channel as Channel (topic)
-import qualified Slack.Channel as Channels (create, find, setTopic)
+import Slack.Channel qualified as Channel (topic)
+import Slack.Channel qualified as Channels (create, find, setTopic)
 import Slack.Group as Group
   ( Groups,
     channelIDs,
     id,
   )
-import qualified Slack.Group as Groups
+import Slack.Group qualified as Groups
   ( create,
     find,
     getMembers,
@@ -41,7 +41,7 @@ import Slack.User as User
     displayName,
     id,
   )
-import qualified Slack.User as Users (find)
+import Slack.User qualified as Users (find)
 import Text.Printf (printf)
 import Text.Show.Functions ()
 import Prelude hiding (filter, unlines)

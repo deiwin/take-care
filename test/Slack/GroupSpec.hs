@@ -11,7 +11,7 @@ import Slack.Group
     Groups,
     runGroups,
   )
-import qualified Slack.Group as Groups
+import Slack.Group qualified as Groups
   ( create,
     find,
     getMembers,

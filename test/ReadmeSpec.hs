@@ -6,11 +6,11 @@ import Config
     runConfig,
     showDryRun,
   )
-import qualified Config (parse)
+import Config qualified (parse)
 import Data.Function ((&))
-import qualified Data.Set as Set
+import Data.Set qualified as Set
 import Data.Text (Text, intercalate, lines, unlines)
-import qualified Data.Text as T (takeWhile)
+import Data.Text qualified as T (takeWhile)
 import Data.Text.IO (readFile)
 import Data.Time.Format.ISO8601 (iso8601ParseM)
 import Effect (Effect (..))
@@ -18,7 +18,7 @@ import Effect.Slack (SlackEffect (..))
 import Polysemy (InterpreterFor, Member, interpret, run, runM)
 import Polysemy.Error (Error, runError, throw)
 import Slack.User (User (..), Users)
-import qualified Slack.User as U (Users (Find, ListAll))
+import Slack.User qualified as U (Users (Find, ListAll))
 import Test.Hspec
   ( Spec,
     it,

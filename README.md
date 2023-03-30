@@ -41,26 +41,25 @@ the commands in this guide to work with simple copy-paste.
 export API_TOKEN=<token>
 ```
 
-The configuration requires referring to users by their Slack user IDs. Use the
-`list-users` command to find these IDs.
+The configuration requires referring to users by their email address. Use the
+`list-users` command to find the email addresses.
 
 ```
 $ docker run --rm -i -e "API_TOKEN=$API_TOKEN" deiwin/take-care:latest list-users
-USLACKBOT: @slackbot
-U111ALICE: @alice
-U22222BOB: @bob
-U333CAROL: @carol
-U4444DAVE: @dave
-U55555EVE: @eve
-U6666FAYE: @faye
-U77777GIL: @gil
-U88888HAL: @hal
+alice@example.com: @alice
+bob@example.com: @bob
+carol@example.com: @carol
+dave@example.com: @dave
+eve@example.com: @eve
+faye@example.com: @faye
+gil@example.com: @gil
+hal@example.com: @hal
 ```
 
-With the list of user IDs at hand, you're ready to create the configuration for
-your teams. Save the following to a file called `teams.dhall` and edit
-according to your needs. The configuration is written in [Dhall][3],
-a programmable configuration language with Haskell-like syntax.
+With the list of user email addresses at hand, you're ready to create the
+configuration for your teams. Save the following to a file called `teams.dhall`
+and edit according to your needs. The configuration is written in [Dhall][3], a
+programmable configuration language with Haskell-like syntax.
 
 ```haskell
 let teams = ./types/zoo/teams.dhall
@@ -116,8 +115,10 @@ And finally, run the `ensure` command.
 
 ```
 $ docker run --rm -i -e "API_TOKEN=$API_TOKEN" deiwin/take-care:latest ensure < teams.dhall
-Team design: success!
-Team dev: success!
+[info] [..] Parsing configuration ..
+..
+[info] [..] Completed applying all configurations
+Program completed successfully! Exiting.
 ```
 
 The `ensure` command _ensures_ that

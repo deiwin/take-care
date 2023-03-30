@@ -108,7 +108,8 @@ showDryRun resolvedRotationEffectsList =
 
 currentResolvedRotationEffects ::
   ( Member Time r,
-    Member Opsgenie r
+    Member Opsgenie r,
+    Member Log r
   ) =>
   Conf ->
   Sem r ResolvedRotationEffects
@@ -118,16 +119,26 @@ currentResolvedRotationEffects conf = do
 
 resolveRotation ::
   ( Member Time r,
-    Member Opsgenie r
+    Member Opsgenie r,
+    Member Log r
   ) =>
   Rotation ->
   Sem r [Text]
 resolveRotation = \case
   Weekly membersList -> do
+    Log.info (pack (printf "Resolving Weekly rotation for %s .." (show membersList)))
     time <- Time.getCurrent
-    return $ currentCaretaker time <$> membersList
-  Const members -> return members
-  OpsgenieScheduleID scheduleID -> whoIsOnCall scheduleID
+    let currentMembers = currentCaretaker time <$> membersList
+    Log.info (pack (printf "Resolved Weekly rotation. Current members are: %s" (show currentMembers)))
+    return currentMembers
+  Const members -> do
+    Log.info (pack (printf "Resolving Const rotation by returning all listed members: %s .." (show members)))
+    return members
+  OpsgenieScheduleID scheduleID -> do
+    Log.info (pack (printf "Resolving OpsgenieScheduleID rotation for schedule ID %s .." scheduleID))
+    currentMembers <- whoIsOnCall scheduleID
+    Log.info (pack (printf "Resolved OpsgenieScheduleID rotation. Current members are: %s" (show currentMembers)))
+    return currentMembers
 
 currentCaretaker :: UTCTime -> [Text] -> Text
 currentCaretaker time candidates = cycle candidates !! utcWeek

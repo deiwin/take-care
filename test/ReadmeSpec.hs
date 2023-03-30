@@ -29,6 +29,7 @@ import Test.Hspec
     shouldMatchList,
   )
 import Prelude hiding (lines, readFile, unlines)
+import Polysemy.Log (interpretLogNull)
 
 spec :: Spec
 spec = do
@@ -39,6 +40,7 @@ spec = do
     traverse currentResolvedRotationEffects confList
       & runTimeConst time
       & runOpsgenieFail
+      & interpretLogNull
       & run
       & ( `shouldMatchList`
             [ ( Set.fromList ["bob@example.com"],
@@ -106,6 +108,7 @@ spec = do
       & runOpsgenieFail
       & mockRunUser
       & runError
+      & interpretLogNull
       & run
       & (`shouldBe` Right result)
 

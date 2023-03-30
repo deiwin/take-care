@@ -102,6 +102,8 @@ spec = do
         & ( `shouldBe`
               ( [ LogMessage Info "Parsing configuration ..",
                   LogMessage Info "Resolving rotation effects ..",
+                  LogMessage Info "Resolving Weekly rotation for [[\"missing@example.com\"]] ..",
+                  LogMessage Info "Resolved Weekly rotation. Current members are: [\"missing@example.com\"]",
                   LogMessage Info "Showing resolved rotation effects .."
                 ],
                 Left "Could not find user with email: missing@example.com"
@@ -132,6 +134,8 @@ spec = do
         & ( `shouldBe`
               ( [ LogMessage Info "Parsing configuration ..",
                   LogMessage Info "Resolving rotation effects ..",
+                  LogMessage Info "Resolving OpsgenieScheduleID rotation for schedule ID schedule-id ..",
+                  LogMessage Info "Resolved OpsgenieScheduleID rotation. Current members are: [\"missing@example.com\"]",
                   LogMessage Info "Showing resolved rotation effects .."
                 ],
                 Left "Could not find user with email: missing@example.com"
@@ -201,6 +205,11 @@ spec = do
         & ( `shouldBe`
               ( [ LogMessage Info "Parsing configuration ..",
                   LogMessage Info "Resolving rotation effects ..",
+                  LogMessage Info "Resolving Weekly rotation for [[\"alice@example.com\",\"bob@example.com\"]] ..",
+                  LogMessage Info "Resolved Weekly rotation. Current members are: [\"alice@example.com\"]",
+                  LogMessage Info "Resolving Const rotation by returning all listed members: [\"alice@example.com\",\"bob@example.com\",\"caroline@example.com\"] ..",
+                  LogMessage Info "Resolving OpsgenieScheduleID rotation for schedule ID schedule-id ..",
+                  LogMessage Info "Resolved OpsgenieScheduleID rotation. Current members are: [\"dave@example.com\",\"eve@example.com\"]",
                   LogMessage Info "Showing resolved rotation effects .."
                 ],
                 Right
@@ -285,6 +294,11 @@ spec = do
         & ( `shouldBe`
               ( [ LogMessage Info "Parsing configuration ..",
                   LogMessage Info "Resolving rotation effects ..",
+                  LogMessage Info "Resolving Weekly rotation for [[\"alice@example.com\",\"bob@example.com\"]] ..",
+                  LogMessage Info "Resolved Weekly rotation. Current members are: [\"alice@example.com\"]",
+                  LogMessage Info "Resolving Const rotation by returning all listed members: [\"alice@example.com\",\"bob@example.com\",\"caroline@example.com\"] ..",
+                  LogMessage Info "Resolving OpsgenieScheduleID rotation for schedule ID schedule-id ..",
+                  LogMessage Info "Resolved OpsgenieScheduleID rotation. Current members are: [\"dave@example.com\",\"eve@example.com\"]",
                   LogMessage Info "Applying all configurations ..",
                   LogMessage Info "Applying all effects for a rotation ..",
                   LogMessage Info "Applying to members fromList [\"alice@example.com\"] the effect Slack (SetGroup {handle = \"design-caretaker\", name = \"Team design caretaker(s)\", channels = []}) ..",

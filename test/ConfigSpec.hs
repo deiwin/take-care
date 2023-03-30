@@ -17,6 +17,7 @@ import Opsgenie (Opsgenie (..))
 import Polysemy (InterpreterFor, Sem, interpret, run, runM)
 import Test.Hspec (Spec, it, shouldMatchList)
 import Prelude hiding (lines, readFile, unlines)
+import Polysemy.Log (interpretLogNull)
 
 spec :: Spec
 spec = do
@@ -36,6 +37,7 @@ spec = do
     traverse currentResolvedRotationEffects confList
       & runTimeConst time
       & runOpsgenieFail
+      & interpretLogNull
       & run
       & ( `shouldMatchList`
             [ ( Set.fromList ["whatever"],
@@ -66,6 +68,7 @@ spec = do
     traverse currentResolvedRotationEffects confList
       & runTimeConst time
       & runOpsgenieFail
+      & interpretLogNull
       & run
       & ( `shouldMatchList`
             [ ( Set.fromList ["user-id"],
@@ -84,7 +87,6 @@ spec = do
     confList <-
       parseConfList
         [trimming|
-          let SlackEffect = ./types/core/Effect/Slack.dhall
           let Effect = ./types/core/Effect.dhall
           let Rotation = ./types/core/Rotation.dhall
            in [ { rotation = Rotation.Weekly [["user-id-one", "user-id-two"]]
@@ -97,6 +99,7 @@ spec = do
     traverse currentResolvedRotationEffects confList
       & runOpsgenieFail
       & runTimeConst time
+      & interpretLogNull
       & run
       & ( `shouldMatchList`
             [ ( Set.fromList ["user-id-one"],
@@ -109,7 +112,6 @@ spec = do
     confList <-
       parseConfList
         [trimming|
-          let SlackEffect = ./types/core/Effect/Slack.dhall
           let Effect = ./types/core/Effect.dhall
           let Rotation = ./types/core/Rotation.dhall
            in [ { rotation = Rotation.OpsgenieScheduleID "schedule-id"
@@ -127,6 +129,7 @@ spec = do
               else error "Unexpected schedule ID"
         )
       & runTimeConst time
+      & interpretLogNull
       & run
       & ( `shouldMatchList`
             [ ( Set.fromList ["user@example.com"],

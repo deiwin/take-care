@@ -32,9 +32,12 @@ import Slack.Group as Group (Groups, runGroups)
 import Slack.User as User (Users, displayName, email, runUsers)
 import Slack.User qualified as User (Effects)
 import Slack.User qualified as Users (listAll)
-import Slack.Util (NetCtx, Slack, runNetCtx, runSlack)
+import Slack.Util (Slack, runSlack)
+import Slack.Util qualified as Slack (NetCtx, runNetCtx)
 import Text.Printf (printf)
 import Text.Show.Functions ()
+import Opsgenie (Opsgenie, runOpsgenie)
+import Opsgenie qualified (NetCtx, runNetCtx)
 import Prelude hiding (filter, unlines)
 
 type family (++) (as :: [k]) (bs :: [k]) :: [k] where
@@ -50,7 +53,9 @@ type CanonicalEffects =
     ++ User.Effects
     ++ '[ Groups,
           Slack,
-          Input NetCtx,
+          Input Slack.NetCtx,
+          Opsgenie,
+          Input Opsgenie.NetCtx,
           Env,
           Error Text
         ]
@@ -67,7 +72,9 @@ runCanonical =
     >>> runUsers
     >>> runGroups
     >>> runSlack
-    >>> runNetCtx
+    >>> Slack.runNetCtx
+    >>> runOpsgenie
+    >>> Opsgenie.runNetCtx
     >>> runEnv
     >>> errorToIOFinal
     >>> runLog
@@ -78,6 +85,7 @@ ensure ::
   ( Member Config r,
     Member Time r,
     Member (Error Text) r,
+    Member Opsgenie r,
     Member Channels r,
     Member Users r,
     Member Groups r,
@@ -98,6 +106,7 @@ dryRunEnsure ::
   ( Member Config r,
     Member Time r,
     Member (Error Text) r,
+    Member Opsgenie r,
     Member Users r,
     Member Log r
   ) =>

@@ -2,11 +2,7 @@
 
 module ConfigSpec (spec) where
 
-import Config
-  ( Conf,
-    currentResolvedRotationEffects,
-    runConfig,
-  )
+import Config (Conf, currentResolvedRotationEffects, runConfig)
 import Config qualified (parse)
 import Data.Function ((&))
 import Data.Set qualified as Set
@@ -17,12 +13,9 @@ import Effect (Effect (..))
 import Effect.Slack (SlackEffect (..))
 import IO (Time (..))
 import NeatInterpolation (trimming)
-import Polysemy (InterpreterFor, interpret, run, runM)
-import Test.Hspec
-  ( Spec,
-    it,
-    shouldMatchList,
-  )
+import Opsgenie (Opsgenie (..))
+import Polysemy (InterpreterFor, Sem, interpret, run, runM)
+import Test.Hspec (Spec, it, shouldMatchList)
 import Prelude hiding (lines, readFile, unlines)
 
 spec :: Spec
@@ -42,6 +35,7 @@ spec = do
 
     traverse currentResolvedRotationEffects confList
       & runTimeConst time
+      & runOpsgenieFail
       & run
       & ( `shouldMatchList`
             [ ( Set.fromList ["whatever"],
@@ -71,6 +65,7 @@ spec = do
 
     traverse currentResolvedRotationEffects confList
       & runTimeConst time
+      & runOpsgenieFail
       & run
       & ( `shouldMatchList`
             [ ( Set.fromList ["user-id"],
@@ -93,32 +88,59 @@ spec = do
           let Effect = ./types/core/Effect.dhall
           let Rotation = ./types/core/Rotation.dhall
            in [ { rotation = Rotation.Weekly [["user-id-one", "user-id-two"]]
-                , effects = [ Effect.Slack (SlackEffect.SetGroup
-                                { handle = "group-handle"
-                                , name = "group-name"
-                                , channels = ["channel-name"]
-                                })
-                            ]
+                , effects = [] : List Effect
                 }
               ]
         |]
     time <- iso8601ParseM "2021-10-10T00:00:00Z"
 
     traverse currentResolvedRotationEffects confList
+      & runOpsgenieFail
       & runTimeConst time
       & run
       & ( `shouldMatchList`
             [ ( Set.fromList ["user-id-one"],
-                [ Slack
-                    SetGroup
-                      { handle = "group-handle",
-                        name = "group-name",
-                        channels = ["channel-name"]
-                      }
-                ]
+                []
               )
             ]
         )
+
+  it "resolves OpsgenieScheduleID rotation" $ do
+    confList <-
+      parseConfList
+        [trimming|
+          let SlackEffect = ./types/core/Effect/Slack.dhall
+          let Effect = ./types/core/Effect.dhall
+          let Rotation = ./types/core/Rotation.dhall
+           in [ { rotation = Rotation.OpsgenieScheduleID "schedule-id"
+                , effects = [] : List Effect
+                }
+              ]
+        |]
+    time <- iso8601ParseM "2021-10-10T00:00:00Z"
+
+    traverse currentResolvedRotationEffects confList
+      & runOpsgenie
+        ( \id ->
+            if id == "schedule-id"
+              then return ["user@example.com"]
+              else error "Unexpected schedule ID"
+        )
+      & runTimeConst time
+      & run
+      & ( `shouldMatchList`
+            [ ( Set.fromList ["user@example.com"],
+                []
+              )
+            ]
+        )
+
+runOpsgenieFail :: InterpreterFor Opsgenie r
+runOpsgenieFail = runOpsgenie (\_ -> error "Expected Opsgenie not to be called")
+
+runOpsgenie :: (Text -> Sem r [Text]) -> InterpreterFor Opsgenie r
+runOpsgenie f = interpret \case
+  WhoIsOnCall scheduleID -> f scheduleID
 
 runTimeConst :: UTCTime -> InterpreterFor Time r
 runTimeConst time = interpret \case

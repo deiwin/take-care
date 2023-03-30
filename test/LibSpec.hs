@@ -18,6 +18,7 @@ import Effect.Slack (SlackEffect (..))
 import IO (Time (..))
 import Lib (dryRunEnsure, ensure, listUsers)
 import NeatInterpolation (trimming)
+import Opsgenie (Opsgenie (..))
 import Polysemy (InterpreterFor, Member, Sem, interpret, run)
 import Polysemy qualified as P (Members)
 import Polysemy.Error (Error, note, runError, throw)
@@ -94,6 +95,37 @@ spec = do
           ]
         & runTimeConst time
         & runListUsersConst []
+        & runOpsgenieFail
+        & runError
+        & runLogToList
+        & run
+        & ( `shouldBe`
+              ( [ LogMessage Info "Parsing configuration ..",
+                  LogMessage Info "Resolving rotation effects ..",
+                  LogMessage Info "Showing resolved rotation effects .."
+                ],
+                Left "Could not find user with email: missing@example.com"
+              )
+          )
+
+    it "returns an error if user email returned from Opsgenie does not exist" $ do
+      time <- iso8601ParseM "2021-10-10T00:00:00Z"
+      dryRunEnsure "ignored"
+        & runConfigConst
+          [ Conf
+              { rotation = OpsgenieScheduleID "schedule-id",
+                effects =
+                  [ Slack
+                      SetChannelTopic
+                        { name = "tm-team",
+                          topic = const "topic"
+                        }
+                  ]
+              }
+          ]
+        & runOpsgenieConst ["missing@example.com"]
+        & runTimeConst time
+        & runListUsersConst []
         & runError
         & runLogToList
         & run
@@ -136,13 +168,32 @@ spec = do
                           channels = ["tm-team"]
                         }
                   ]
+              },
+            Conf
+              { rotation = OpsgenieScheduleID "schedule-id",
+                effects =
+                  [ Slack
+                      SetGroup
+                        { handle = "second-team",
+                          name = "Second team",
+                          channels = ["tm-second"]
+                        },
+                    Slack
+                      SetChannelTopic
+                        { name = "tm-second",
+                          topic = const "topic"
+                        }
+                  ]
               }
           ]
+        & runOpsgenieConst ["dave@example.com", "eve@example.com"]
         & runTimeConst time
         & runListUsersConst
           [ User {_id = "1111ALICE", _displayName = "Alice", _email = "alice@example.com"},
             User {_id = "222222BOB", _displayName = "Bob", _email = "bob@example.com"},
-            User {_id = "3CAROLINE", _displayName = "Caroline", _email = "caroline@example.com"}
+            User {_id = "3CAROLINE", _displayName = "Caroline", _email = "caroline@example.com"},
+            User {_id = "44444DAVE", _displayName = "Dave", _email = "dave@example.com"},
+            User {_id = "555555EVE", _displayName = "Eve", _email = "eve@example.com"}
           ]
         & runError
         & runLogToList
@@ -160,6 +211,10 @@ spec = do
 
                     For alice@example.com, bob@example.com, caroline@example.com:
                       Slack.SetGroup: @team-team {name = "Team team", channels = ["tm-team"]}
+
+                    For dave@example.com, eve@example.com:
+                      Slack.SetGroup: @second-team {name = "Second team", channels = ["tm-second"]}
+                      Slack.SetChannelTopic #tm-second: topic
                   |]
               )
           )
@@ -195,13 +250,32 @@ spec = do
                           channels = ["tm-design"]
                         }
                   ]
+              },
+            Conf
+              { rotation = OpsgenieScheduleID "schedule-id",
+                effects =
+                  [ Slack
+                      SetGroup
+                        { handle = "second-team",
+                          name = "Second team",
+                          channels = ["tm-second"]
+                        },
+                    Slack
+                      SetChannelTopic
+                        { name = "tm-second",
+                          topic = const "topic"
+                        }
+                  ]
               }
           ]
+        & runOpsgenieConst ["dave@example.com", "eve@example.com"]
         & runTimeConst time
         & runListUsersConst
           [ User {_id = "1111ALICE", _displayName = "Alice", _email = "alice@example.com"},
             User {_id = "222222BOB", _displayName = "Bob", _email = "bob@example.com"},
-            User {_id = "3CAROLINE", _displayName = "Caroline", _email = "caroline@example.com"}
+            User {_id = "3CAROLINE", _displayName = "Caroline", _email = "caroline@example.com"},
+            User {_id = "44444DAVE", _displayName = "Dave", _email = "dave@example.com"},
+            User {_id = "555555EVE", _displayName = "Eve", _email = "eve@example.com"}
           ]
         & runChannels Map.empty
         & runGroups Map.empty
@@ -228,6 +302,16 @@ spec = do
                   LogMessage Info "Finding or creating the group @design-team ..",
                   LogMessage Info "Updating group member IDs from fromList [] to fromList [\"1111ALICE\",\"222222BOB\",\"3CAROLINE\"] ..",
                   LogMessage Info "Finished applying effect Slack (SetGroup {handle = \"design-team\", name = \"Team design\", channels = [\"tm-design\"]})",
+                  LogMessage Info "Applying all effects for a rotation ..",
+                  LogMessage Info "Applying to members fromList [\"dave@example.com\",\"eve@example.com\"] the effect Slack (SetGroup {handle = \"second-team\", name = \"Second team\", channels = [\"tm-second\"]}) ..",
+                  LogMessage Info "Finding or creating the following channels: [\"tm-second\"] ..",
+                  LogMessage Info "Finding or creating the group @second-team ..",
+                  LogMessage Info "Updating group member IDs from fromList [] to fromList [\"44444DAVE\",\"555555EVE\"] ..",
+                  LogMessage Info "Finished applying effect Slack (SetGroup {handle = \"second-team\", name = \"Second team\", channels = [\"tm-second\"]})",
+                  LogMessage Info "Applying to members fromList [\"dave@example.com\",\"eve@example.com\"] the effect Slack (SetChannelTopic {name = \"tm-second\", topic = \"topic\"}) ..",
+                  LogMessage Info "Finding or creating channel #tm-second ..",
+                  LogMessage Info "Updating topic if changed from \"\" to \"topic\" ..",
+                  LogMessage Info "Finished applying effect Slack (SetChannelTopic {name = \"tm-second\", topic = \"topic\"})",
                   LogMessage Info "Completed applying all configurations"
                 ],
                 Right
@@ -251,6 +335,16 @@ spec = do
                               },
                             ["1111ALICE", "222222BOB", "3CAROLINE"]
                           )
+                        ),
+                        ( "id_second-team",
+                          ( Group
+                              { _id = "id_second-team",
+                                _handle = "second-team",
+                                _name = "Second team",
+                                _channelIDs = ["id_tm-second"]
+                              },
+                            ["44444DAVE", "555555EVE"]
+                          )
                         )
                       ],
                     ( Map.fromList
@@ -259,6 +353,13 @@ spec = do
                               { _id = "id_tm-design",
                                 _name = "tm-design",
                                 _topic = "Caretaker is: Alice"
+                              }
+                          ),
+                          ( "id_tm-second",
+                            Channel
+                              { _id = "id_tm-second",
+                                _name = "tm-second",
+                                _topic = "topic"
                               }
                           )
                         ],
@@ -295,6 +396,7 @@ spec = do
           [User {_id = "user-id", _displayName = "user-display-name", _email = "user@example.com"}]
         & runChannels Map.empty
         & runGroups Map.empty
+        & runOpsgenieFail
         & runError
         & interpretLogNull
         & run
@@ -426,3 +528,11 @@ runListUsersConst users = interpret \case
 
 runLogToList :: Sem (Log ': Output LogMessage ': r) a -> Sem r ([LogMessage], a)
 runLogToList = runOutputList . interpretLogOutput
+
+runOpsgenieConst :: [Text] -> InterpreterFor Opsgenie r
+runOpsgenieConst userEmails = interpret \case
+  WhoIsOnCall _scheduleID -> return userEmails
+
+runOpsgenieFail :: InterpreterFor Opsgenie r
+runOpsgenieFail = interpret \case
+  WhoIsOnCall _scheduleID -> error "Expected Opsgenie not to be called"

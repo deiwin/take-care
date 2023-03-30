@@ -17,6 +17,7 @@ import Data.Time.Format.ISO8601 (iso8601ParseM)
 import Effect (Effect (..))
 import Effect.Slack (SlackEffect (..))
 import IO (Time (..))
+import Opsgenie (Opsgenie (..))
 import Polysemy (InterpreterFor, Member, interpret, run, runM)
 import Polysemy.Error (Error, runError, throw)
 import Slack.User (User (..), Users)
@@ -37,6 +38,7 @@ spec = do
 
     traverse currentResolvedRotationEffects confList
       & runTimeConst time
+      & runOpsgenieFail
       & run
       & ( `shouldMatchList`
             [ ( Set.fromList ["bob@example.com"],
@@ -101,6 +103,7 @@ spec = do
     traverse currentResolvedRotationEffects confList
       >>= showDryRun
       & runTimeConst time
+      & runOpsgenieFail
       & mockRunUser
       & runError
       & run
@@ -138,3 +141,7 @@ interUnlines = intercalate "\n"
 runTimeConst :: UTCTime -> InterpreterFor Time r
 runTimeConst time = interpret \case
   GetCurrent -> return time
+
+runOpsgenieFail :: InterpreterFor Opsgenie r
+runOpsgenieFail = interpret \case
+  WhoIsOnCall _scheduleID -> error "Expected Opsgenie not to be called"

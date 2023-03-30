@@ -39,11 +39,11 @@ spec = do
 
     traverse currentResolvedRotationEffects confList
       & runTimeConst time
-      & runOpsgenieFail
+      & runOpsgenieConst ["carol@example.com"]
       & interpretLogNull
       & run
       & ( `shouldMatchList`
-            [ ( Set.fromList ["bob@example.com"],
+            [ ( Set.fromList ["alice@example.com"],
                 [ Slack
                     SetChannelTopic
                       { name = "tm-design",
@@ -61,7 +61,7 @@ spec = do
                       }
                 ]
               ),
-              ( Set.fromList ["alice@example.com", "bob@example.com", "carol@example.com", "dave@example.com"],
+              ( Set.fromList ["alice@example.com", "bob@example.com", "dave@example.com"],
                 [ Slack
                     SetGroup
                       { handle = "design-team",
@@ -92,6 +92,15 @@ spec = do
                         channels = ["tm-dev"]
                       }
                 ]
+              ),
+              ( Set.fromList ["carol@example.com"],
+                [ Slack
+                    SetGroup
+                      { handle = "platform-caretaker",
+                        name = "Platform team caretaker(s)",
+                        channels = ["tm-platform"]
+                      }
+                ]
               )
             ]
         )
@@ -105,7 +114,7 @@ spec = do
     traverse currentResolvedRotationEffects confList
       >>= showDryRun
       & runTimeConst time
-      & runOpsgenieFail
+      & runOpsgenieConst ["carol@example.com"]
       & mockRunUser
       & runError
       & interpretLogNull
@@ -145,6 +154,6 @@ runTimeConst :: UTCTime -> InterpreterFor Time r
 runTimeConst time = interpret \case
   GetCurrent -> return time
 
-runOpsgenieFail :: InterpreterFor Opsgenie r
-runOpsgenieFail = interpret \case
-  WhoIsOnCall _scheduleID -> error "Expected Opsgenie not to be called"
+runOpsgenieConst :: [Text] -> InterpreterFor Opsgenie r
+runOpsgenieConst userEmails = interpret \case
+  WhoIsOnCall _scheduleID -> return userEmails

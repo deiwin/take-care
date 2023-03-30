@@ -41,8 +41,13 @@ the commands in this guide to work with simple copy-paste.
 export API_TOKEN=<token>
 ```
 
-The configuration requires referring to users by their email address. Use the
-`list-users` command to find the email addresses.
+If you're planning to also use the Opsgenie integration, then make sure to also
+set the `OPSGENIE_API_TOKEN` environment variable. Follow the [Getting an
+Opsgenie API token](#getting-an-opsgenie-api-token) section below to create the
+API token if necessary.
+
+Next, the configuration requires referring to users by their email address. Use
+the `list-users` command to find the email addresses.
 
 ```
 $ docker run --rm -i -e "API_TOKEN=$API_TOKEN" deiwin/take-care:latest list-users
@@ -62,11 +67,17 @@ and edit according to your needs. The configuration is written in [Dhall][3], a
 programmable configuration language with Haskell-like syntax.
 
 ```haskell
+let SlackEffect = ./types/core/Effect/Slack.dhall
+                ? https://github.com/deiwin/take-care/raw/v0.6.2/types/core/Effect/Slack.dhall
+let Effect = ./types/core/Effect.dhall
+           ? https://github.com/deiwin/take-care/raw/v0.6.2/types/core/Effect.dhall
+let Rotation = ./types/core/Rotation.dhall
+             ? https://github.com/deiwin/take-care/raw/v0.6.2/types/core/Rotation.dhall
 let teams = ./types/zoo/teams.dhall
           ? https://github.com/deiwin/take-care/raw/v0.6.2/types/zoo/teams.dhall
  in teams
       [ { members =
-          { caretakers = [ [ "alice@example.com", "bob@example.com", "carol@example.com" ] ]
+          { caretakers = [ [ "alice@example.com", "bob@example.com" ] ]
           , others = [ "dave@example.com" ]
           }
         , name = "design"
@@ -89,18 +100,28 @@ let teams = ./types/zoo/teams.dhall
         , topic = \(caretakers : Text) -> "${caretakers} are the caretakers"
         }
       ]
+    # [ { rotation = Rotation.OpsgenieScheduleID "123e4567-e89b-12d3-a456-426614174000"
+        , effects = [ Effect.Slack
+                        ( SlackEffect.SetGroup
+                          { handle = "platform-caretaker"
+                          , name = "Platform team caretaker(s)"
+                          , channels = ["tm-platform"]
+                          }
+                        )
+                    ]
+        }
+      ]
 ```
 
-Verify the configuration with the `--dry-run` flag for the `ensure`
-command.
+Verify the configuration with the `--dry-run` flag for the `ensure` command.
 
 ```dryRunExample
-$ docker run --rm -i -e "API_TOKEN=$API_TOKEN" deiwin/take-care:latest ensure --dry-run < teams.dhall
-For bob@example.com:
-  Slack.SetChannelTopic #tm-design: Stand-up *9:30* :paw_prints: Board :incoming_envelope: https://team.board/url :paw_prints: Caretaker @bob
+$ docker run --rm -i -e "API_TOKEN=$API_TOKEN" -e "OPSGENIE_API_TOKEN=$OPSGENIE_API_TOKEN" deiwin/take-care:latest ensure --dry-run < teams.dhall
+For alice@example.com:
+  Slack.SetChannelTopic #tm-design: Stand-up *9:30* :paw_prints: Board :incoming_envelope: https://team.board/url :paw_prints: Caretaker @alice
   Slack.SetGroup: @design-caretaker {name = "Team design caretaker(s)", channels = []}
 
-For alice@example.com, bob@example.com, carol@example.com, dave@example.com:
+For alice@example.com, bob@example.com, dave@example.com:
   Slack.SetGroup: @design-team {name = "Team design", channels = ["tm-design"]}
 
 For eve@example.com, gil@example.com:
@@ -109,12 +130,15 @@ For eve@example.com, gil@example.com:
 
 For eve@example.com, faye@example.com, gil@example.com, hal@example.com:
   Slack.SetGroup: @dev-team {name = "Team dev", channels = ["tm-dev"]}
+
+For carol@example.com:
+  Slack.SetGroup: @platform-caretaker {name = "Platform team caretaker(s)", channels = ["tm-platform"]}
 ```
 
 And finally, run the `ensure` command.
 
 ```
-$ docker run --rm -i -e "API_TOKEN=$API_TOKEN" deiwin/take-care:latest ensure < teams.dhall
+$ docker run --rm -i -e "API_TOKEN=$API_TOKEN" -e "OPSGENIE_API_TOKEN=$OPSGENIE_API_TOKEN" deiwin/take-care:latest ensure < teams.dhall
 [info] [..] Parsing configuration ..
 ..
 [info] [..] Completed applying all configurations
@@ -123,14 +147,14 @@ Program completed successfully! Exiting.
 
 The `ensure` command _ensures_ that
 
-- channels `#tm-design` and `#tm-dev`
+- channels `#tm-design`, `#tm-dev`, and `#tm-platform`
   - exist,
   - include the configured team members, and
   - have their topic set per configuration;
 - user groups `@design-team` and `@dev-team`
   - exist and
   - consist of the configured team members; and
-- user groups `@design-caretaker` and `@dev-caretaker`
+- user groups `@design-caretaker`, `@dev-caretaker`, and `@platform-caretaker`
   - exist and
   - consist of the current caretakers (one per caretaker list per team).
 
@@ -156,6 +180,12 @@ The `ensure` command _ensures_ that
   by default, but can be enabled from **Administration** -> **Settings
   & Permissions** -> **Permissions** -> **User Groups**, or from
   https://<your-domain>.slack.com/admin/settings#user_group_restrictions
+
+## Getting an Opsgenie API token
+
+- Follow the [Create an API integration: Using API Integration][7] guide.
+- Make sure **Read Access** and **Enabled** checkboxes are checked. Other
+  permissions are not required.
 
 ## Installation
 
@@ -185,3 +215,4 @@ stack install
 [4]: https://api.slack.com/slack-apps#creating_apps
 [5]: https://api.slack.com/slack-apps#oauth__amp__permissions
 [6]: https://github.com/deiwin/take-care/releases
+[7]: https://support.atlassian.com/opsgenie/docs/create-a-default-api-integration/#%E2%80%8BUsing-API-Integration

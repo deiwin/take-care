@@ -44,8 +44,8 @@ runNetCtx ::
   InterpreterFor (Input NetCtx) r
 runNetCtx program = do
   session <- embed newAPISession
-  tokenM <- Env.lookup "API_TOKEN"
-  token <- BS.pack <$> note "API_TOKEN env variable not set" tokenM
+  tokenM <- Env.lookup "SLACK_API_TOKEN"
+  token <- BS.pack <$> note "SLACK_API_TOKEN env variable not set" tokenM
   runInputConst (NetCtx token session) program
 
 data Slack m a where

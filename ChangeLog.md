@@ -5,6 +5,7 @@
 * Add a OpsgenieScheduleID rotation. The new rotation pulls from Opsgenie the
   list of emails of whoever is on call currently for the specified schedule.
   Requires OPSGENIE_API_TOKEN env variable.
+* Rename API_TOKEN env variable to SLACK_API_TOKEN.
 
 ## v0.6.2
 

@@ -38,7 +38,7 @@ First, save your API token to an environment variable. This allows the rest of
 the commands in this guide to work with simple copy-paste.
 
 ```
-export API_TOKEN=<token>
+export SLACK_API_TOKEN=<token>
 ```
 
 If you're planning to also use the Opsgenie integration, then make sure to also
@@ -50,7 +50,7 @@ Next, the configuration requires referring to users by their email address. Use
 the `list-users` command to find the email addresses.
 
 ```
-$ docker run --rm -i -e "API_TOKEN=$API_TOKEN" deiwin/take-care:latest list-users
+$ docker run --rm -i -e "SLACK_API_TOKEN=$SLACK_API_TOKEN" deiwin/take-care:latest list-users
 alice@example.com: @alice
 bob@example.com: @bob
 carol@example.com: @carol
@@ -116,7 +116,7 @@ let teams = ./types/zoo/teams.dhall
 Verify the configuration with the `--dry-run` flag for the `ensure` command.
 
 ```dryRunExample
-$ docker run --rm -i -e "API_TOKEN=$API_TOKEN" -e "OPSGENIE_API_TOKEN=$OPSGENIE_API_TOKEN" deiwin/take-care:latest ensure --dry-run < teams.dhall
+$ docker run --rm -i -e "SLACK_API_TOKEN=$SLACK_API_TOKEN" -e "OPSGENIE_API_TOKEN=$OPSGENIE_API_TOKEN" deiwin/take-care:latest ensure --dry-run < teams.dhall
 For alice@example.com:
   Slack.SetChannelTopic #tm-design: Stand-up *9:30* :paw_prints: Board :incoming_envelope: https://team.board/url :paw_prints: Caretaker @alice
   Slack.SetGroup: @design-caretaker {name = "Team design caretaker(s)", channels = []}
@@ -138,7 +138,7 @@ For carol@example.com:
 And finally, run the `ensure` command.
 
 ```
-$ docker run --rm -i -e "API_TOKEN=$API_TOKEN" -e "OPSGENIE_API_TOKEN=$OPSGENIE_API_TOKEN" deiwin/take-care:latest ensure < teams.dhall
+$ docker run --rm -i -e "SLACK_API_TOKEN=$SLACK_API_TOKEN" -e "OPSGENIE_API_TOKEN=$OPSGENIE_API_TOKEN" deiwin/take-care:latest ensure < teams.dhall
 [info] [..] Parsing configuration ..
 ..
 [info] [..] Completed applying all configurations

@@ -9,8 +9,7 @@ module DeduplicationStore
   )
 where
 
-import Data.Functor ((<&>))
-import Data.Maybe (fromMaybe)
+import Data.Function ((&))
 import Data.Text (Text, pack)
 import Data.Time.Clock (UTCTime (..))
 import Database.SQLite.Simple (Connection, Only (Only), ToRow (toRow), changes, execute, execute_, open, query)
@@ -53,34 +52,42 @@ runDeduplicationStore ::
   InterpreterFor DeduplicationStore r
 runDeduplicationStore = interpret \case
   IsAlreadyApplied ctx@(DeduplicationContext {..}) -> failToError pack $ do
-    conn <- connection <$> input @DBCtx
-    Log.info (pack (printf "Checking DB whether we have already applied %s .." (show ctx)))
-    [Only count] <-
-      embed $
-        query
-          conn
-          "SELECT COUNT(1) FROM deduplication_store\
-          \ WHERE effects_hash = ?\
-          \ AND input_hash = ?\
-          \ AND unixepoch(valid_until) > unixepoch()"
-          (effectsHash, inputHash)
-    Log.info (pack (printf "Found %d match(es)" count))
-    return (count >= (1 :: Int))
+    dbCtxM <- input
+    case dbCtxM of
+      Nothing -> return False
+      Just (DBCtx' {..}) -> do
+        Log.info (pack (printf "Checking DB whether we have already applied %s .." (show ctx)))
+        [Only count] <-
+          embed $
+            query
+              connection
+              "SELECT COUNT(1) FROM deduplication_store\
+              \ WHERE effects_hash = ?\
+              \ AND input_hash = ?\
+              \ AND unixepoch(valid_until) > unixepoch()"
+              (effectsHash, inputHash)
+        Log.info (pack (printf "Found %d match(es)" count))
+        return (count >= (1 :: Int))
   StoreAppliedContext ctx -> do
-    conn <- connection <$> input @DBCtx
-    Log.info (pack (printf "Upserting to DB: %s .." (show ctx)))
-    embed $
-      execute
-        conn
-        "INSERT INTO deduplication_store\
-        \   (effects_hash, input_hash, valid_until)\
-        \   VALUES (?,?,?)\
-        \ ON CONFLICT(effects_hash) DO UPDATE SET\
-        \   input_hash = excluded.input_hash,\
-        \   valid_until = excluded.valid_until"
-        ctx
+    dbCtxM <- input
+    case dbCtxM of
+      Nothing -> return ()
+      Just (DBCtx' {..}) -> do
+        Log.info (pack (printf "Upserting to DB: %s .." (show ctx)))
+        embed $
+          execute
+            connection
+            "INSERT INTO deduplication_store\
+            \   (effects_hash, input_hash, valid_until)\
+            \   VALUES (?,?,?)\
+            \ ON CONFLICT(effects_hash) DO UPDATE SET\
+            \   input_hash = excluded.input_hash,\
+            \   valid_until = excluded.valid_until"
+            ctx
 
-newtype DBCtx = DBCtx
+type DBCtx = Maybe DBCtx'
+
+newtype DBCtx' = DBCtx'
   { connection :: Connection
   }
 
@@ -92,15 +99,22 @@ runDBCtx ::
   InterpreterFor (Input DBCtx) r
 runDBCtx program = do
   let dbFileName = "deduplication.db"
-  dbPath <-
-    Env.lookup "PERSISTENT_FOLDER_PATH"
-      <&> fromMaybe "" -- Default to empty value, referring to the current folder
-      <&> (\s -> if s == "" then s else s <> "/")
-      <&> (<> dbFileName)
-  Log.info (pack (printf "Opening DB on path %s .." dbPath))
-  connection <- embed $ open dbPath
-  initializeDB connection
-  runInputConst (DBCtx {..}) program
+  persistentPathM <- Env.lookup "PERSISTENT_FOLDER_PATH"
+  dbCtx <-
+    case persistentPathM of
+      Nothing -> do
+        Log.info "Env variable PERSISTENT_FOLDER_PATH not set. Will not use DeduplicationStore."
+        return Nothing
+      Just persistentPath -> do
+        let dbPath =
+              persistentPath
+                & (\s -> if s == "" then s else s <> "/")
+                & (<> dbFileName)
+        Log.info (pack (printf "Opening DB on path %s .." dbPath))
+        connection <- embed $ open dbPath
+        initializeDB connection
+        return (Just DBCtx' {..})
+  runInputConst dbCtx program
 
 initializeDB ::
   ( Member (Embed IO) r,

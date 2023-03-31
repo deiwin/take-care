@@ -17,10 +17,9 @@ import IO (Env)
 import IO qualified as Env (lookup)
 import Network.Wreq (asValue, auth, basicAuth, defaults, param, responseBody)
 import Network.Wreq.Session (Session, getWith, newAPISession)
-import Polysemy (Embed, InterpreterFor, Member, Members, Sem, embed, interpret, makeSem)
+import Polysemy (Embed, InterpreterFor, Member, Sem, embed, interpret, makeSem)
 import Polysemy.Error (Error, note)
 import Polysemy.Input (Input, input, runInputConst)
-import Polysemy.Log (Log)
 import Text.Printf (printf)
 import Prelude hiding (id, lookup)
 
@@ -34,7 +33,6 @@ runOpsgenie ::
     Member (Input NetCtx) r,
     Member (Error Text) r
   ) =>
-  Members '[Error Text, Log] r =>
   InterpreterFor Opsgenie r
 runOpsgenie = interpret \case
   WhoIsOnCall scheduleID -> getOnCalls scheduleID

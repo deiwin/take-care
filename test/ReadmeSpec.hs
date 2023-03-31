@@ -1,25 +1,29 @@
 module ReadmeSpec (spec) where
 
 import Config
-  ( Conf,
-    currentResolvedRotationEffects,
+  ( Conf (effects),
+    resolve,
     runConfig,
     showDryRun,
   )
 import Config qualified (parse)
+import Control.Arrow (Arrow (second))
 import Data.Function ((&))
+import Data.Functor ((<&>))
 import Data.Set qualified as Set
 import Data.Text (Text, intercalate, lines, unlines)
 import Data.Text qualified as T (takeWhile)
 import Data.Text.IO (readFile)
 import Data.Time.Clock (UTCTime)
 import Data.Time.Format.ISO8601 (iso8601ParseM)
+import DeduplicationStore (DeduplicationStore (..))
 import Effect (Effect (..))
 import Effect.Slack (SlackEffect (..))
 import IO (Time (..))
 import Opsgenie (Opsgenie (..))
 import Polysemy (InterpreterFor, Member, interpret, run, runM)
 import Polysemy.Error (Error, runError, throw)
+import Polysemy.Log (interpretLogNull)
 import Slack.User (User (..), Users)
 import Slack.User qualified as U (Users (Find, ListAll))
 import Test.Hspec
@@ -29,7 +33,6 @@ import Test.Hspec
     shouldMatchList,
   )
 import Prelude hiding (lines, readFile, unlines)
-import Polysemy.Log (interpretLogNull)
 
 spec :: Spec
 spec = do
@@ -37,11 +40,13 @@ spec = do
     confList <- readmeText >>= parseConfList
     time <- iso8601ParseM "2021-10-10T00:00:00Z"
 
-    traverse currentResolvedRotationEffects confList
+    resolve confList
       & runTimeConst time
       & runOpsgenieConst ["carol@example.com"]
+      & runDeduplicationStoreNull
       & interpretLogNull
       & run
+      <&> second effects
       & ( `shouldMatchList`
             [ ( Set.fromList ["alice@example.com"],
                 [ Slack
@@ -111,10 +116,11 @@ spec = do
 
     result <- dryRunExample
 
-    traverse currentResolvedRotationEffects confList
+    resolve confList
       >>= showDryRun
       & runTimeConst time
       & runOpsgenieConst ["carol@example.com"]
+      & runDeduplicationStoreNull
       & mockRunUser
       & runError
       & interpretLogNull
@@ -157,3 +163,8 @@ runTimeConst time = interpret \case
 runOpsgenieConst :: [Text] -> InterpreterFor Opsgenie r
 runOpsgenieConst userEmails = interpret \case
   WhoIsOnCall _scheduleID -> return userEmails
+
+runDeduplicationStoreNull :: InterpreterFor DeduplicationStore r
+runDeduplicationStoreNull = interpret \case
+  IsAlreadyApplied _ -> return False
+  StoreAppliedContext _ -> return ()

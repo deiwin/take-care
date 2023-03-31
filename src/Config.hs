@@ -5,8 +5,8 @@
 module Config
   ( Conf (..),
     Rotation (..),
-    ResolvedRotationEffects,
-    currentResolvedRotationEffects,
+    ResolvedConf,
+    resolve,
     apply,
     showDryRun,
 
@@ -17,14 +17,18 @@ module Config
   )
 where
 
+import Control.Monad (filterM)
 import Data.Foldable (traverse_)
 import Data.Function ((&))
 import Data.Functor ((<&>))
+import Data.Hashable (Hashable (hash))
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Data.Text (Text, intercalate, lines, pack, replicate)
+import Data.Time (addDays)
 import Data.Time.Calendar.WeekDate (toWeekDate)
 import Data.Time.Clock (UTCTime (..))
+import DeduplicationStore (DeduplicationContext (..), DeduplicationStore (..), isAlreadyApplied, storeAppliedContext)
 import Dhall (FromDhall)
 import Dhall qualified (auto, input)
 import Dhall.TH (HaskellType (..), makeHaskellTypes)
@@ -62,7 +66,7 @@ data Config m a where
 
 makeSem ''Config
 
-type ResolvedRotationEffects = (Set Text, [Effect])
+type ResolvedConf = (Set Text, Conf)
 
 runConfig :: Member (Embed IO) r => InterpreterFor Config r
 runConfig = interpret \case
@@ -73,28 +77,32 @@ apply ::
     Member Channels r,
     Member Users r,
     Member Groups r,
-    Member Log r
+    Member Log r,
+    Member DeduplicationStore r,
+    Member Time r
   ) =>
-  [(Set Text, [Effect])] ->
+  [ResolvedConf] ->
   Sem r ()
 apply = traverse_ (uncurry applyGroup)
   where
-    applyGroup members effects = do
+    applyGroup members conf@Conf{effects} = do
       Log.info "Applying all effects for a rotation .."
       traverse_ (Effect.apply members) effects
+      ctx <- deduplicationContext conf
+      maybe (return ()) storeAppliedContext ctx
 
 showDryRun ::
   ( Member (Error Text) r,
     Member Users r
   ) =>
-  [(Set Text, [Effect])] ->
+  [ResolvedConf] ->
   Sem r Text
-showDryRun resolvedRotationEffectsList =
-  resolvedRotationEffectsList
+showDryRun resolvedConf =
+  resolvedConf
     & traverse showGroup
     <&> intercalate "\n\n"
   where
-    showGroup (members, effects) = interUnlines <$> sequence lines
+    showGroup (members, Conf{effects}) = interUnlines <$> sequence lines
       where
         lines = memberLine : effectLines
         memberLine =
@@ -106,16 +114,33 @@ showDryRun resolvedRotationEffectsList =
             & return
         effectLines = padLeft 2 <<$>> Effect.showDryRun members <$> effects
 
-currentResolvedRotationEffects ::
+resolve ::
+  ( Member Time r,
+    Member Opsgenie r,
+    Member Log r,
+    Member DeduplicationStore r
+  ) =>
+  [Conf] ->
+  Sem r [ResolvedConf]
+resolve confList =
+  confList
+    & filterM (fmap not . shouldExclude)
+    >>= traverse currentResolvedConf
+  where
+    shouldExclude conf =
+      deduplicationContext conf
+        >>= maybe (return False) isAlreadyApplied
+
+currentResolvedConf ::
   ( Member Time r,
     Member Opsgenie r,
     Member Log r
   ) =>
   Conf ->
-  Sem r ResolvedRotationEffects
-currentResolvedRotationEffects conf = do
+  Sem r ResolvedConf
+currentResolvedConf conf = do
   userSet <- Set.fromList <$> resolveRotation (rotation conf)
-  return (userSet, effects conf)
+  return (userSet, conf)
 
 resolveRotation ::
   ( Member Time r,
@@ -139,6 +164,30 @@ resolveRotation = \case
     currentMembers <- whoIsOnCall scheduleID
     Log.info (pack (printf "Resolved OpsgenieScheduleID rotation. Current members are: %s" (show currentMembers)))
     return currentMembers
+
+deduplicationContext ::
+  ( Member Time r
+  ) =>
+  Conf ->
+  Sem r (Maybe DeduplicationContext)
+deduplicationContext (Conf {..}) =
+  case rotation of
+    Const _ -> return Nothing
+    OpsgenieScheduleID _ -> return Nothing
+    Weekly input -> do
+      let effectsHash = pack $ show $ hash effects
+      let inputHash = pack $ show $ hash input
+      validUntil <- nextWeek <$> Time.getCurrent
+      return (Just (DeduplicationContext {..}))
+
+nextWeek :: UTCTime -> UTCTime
+nextWeek time = UTCTime newDay 0
+  where
+    day = utctDay time
+    (_, _, weekDay) = toWeekDate day
+    -- weekDay is a value between 1 (Monday) and 7 (Sunday). Add however much
+    -- is needed to get to the next Monday.
+    newDay = addDays (fromIntegral (8 - weekDay)) day
 
 currentCaretaker :: UTCTime -> [Text] -> Text
 currentCaretaker time candidates = cycle candidates !! utcWeek

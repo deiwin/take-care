@@ -13,6 +13,7 @@ import Data.Map qualified as Map
 import Data.Text (Text, intercalate)
 import Data.Time.Clock (UTCTime)
 import Data.Time.Format.ISO8601 (iso8601ParseM)
+import DeduplicationStore (DeduplicationStore (IsAlreadyApplied, StoreAppliedContext))
 import Effect (Effect (..))
 import Effect.Slack (SlackEffect (..))
 import IO (Time (..))
@@ -96,6 +97,7 @@ spec = do
         & runTimeConst time
         & runListUsersConst []
         & runOpsgenieFail
+        & runDeduplicationStoreNull
         & runError
         & runLogToList
         & run
@@ -128,6 +130,7 @@ spec = do
         & runOpsgenieConst ["missing@example.com"]
         & runTimeConst time
         & runListUsersConst []
+        & runDeduplicationStoreNull
         & runError
         & runLogToList
         & run
@@ -199,6 +202,7 @@ spec = do
             User {_id = "44444DAVE", _displayName = "Dave", _email = "dave@example.com"},
             User {_id = "555555EVE", _displayName = "Eve", _email = "eve@example.com"}
           ]
+        & runDeduplicationStoreNull
         & runError
         & runLogToList
         & run
@@ -288,6 +292,7 @@ spec = do
           ]
         & runChannels Map.empty
         & runGroups Map.empty
+        & runDeduplicationStoreNull
         & runError
         & runLogToList
         & run
@@ -411,6 +416,7 @@ spec = do
         & runChannels Map.empty
         & runGroups Map.empty
         & runOpsgenieFail
+        & runDeduplicationStoreNull
         & runError
         & interpretLogNull
         & run
@@ -550,3 +556,8 @@ runOpsgenieConst userEmails = interpret \case
 runOpsgenieFail :: InterpreterFor Opsgenie r
 runOpsgenieFail = interpret \case
   WhoIsOnCall _scheduleID -> error "Expected Opsgenie not to be called"
+
+runDeduplicationStoreNull :: InterpreterFor DeduplicationStore r
+runDeduplicationStoreNull = interpret \case
+  IsAlreadyApplied _ -> return False
+  StoreAppliedContext _ -> return ()

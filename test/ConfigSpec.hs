@@ -2,26 +2,29 @@
 
 module ConfigSpec (spec) where
 
-import Config (Conf, currentResolvedRotationEffects, runConfig)
+import Config (Conf (..), resolve, runConfig)
 import Config qualified (parse)
+import Control.Arrow (second)
 import Data.Function ((&))
+import Data.Functor ((<&>))
 import Data.Set qualified as Set
 import Data.Text (Text)
 import Data.Time.Clock (UTCTime)
 import Data.Time.Format.ISO8601 (iso8601ParseM)
+import DeduplicationStore (DeduplicationStore (..))
 import Effect (Effect (..))
 import Effect.Slack (SlackEffect (..))
 import IO (Time (..))
 import NeatInterpolation (trimming)
 import Opsgenie (Opsgenie (..))
 import Polysemy (InterpreterFor, Sem, interpret, run, runM)
+import Polysemy.Log (interpretLogNull)
 import Test.Hspec (Spec, it, shouldMatchList)
 import Prelude hiding (lines, readFile, unlines)
-import Polysemy.Log (interpretLogNull)
 
 spec :: Spec
 spec = do
-  it "returns no ResolvedRotationEffects for an empty list of effects" $ do
+  it "returns an empty list for an empty list of effects" $ do
     confList <-
       parseConfList
         [trimming|
@@ -34,11 +37,13 @@ spec = do
         |]
     time <- iso8601ParseM "2021-10-10T00:00:00Z"
 
-    traverse currentResolvedRotationEffects confList
+    resolve confList
       & runTimeConst time
       & runOpsgenieFail
+      & runDeduplicationStoreNull
       & interpretLogNull
       & run
+      <&> second effects
       & ( `shouldMatchList`
             [ ( Set.fromList ["whatever"],
                 []
@@ -65,11 +70,13 @@ spec = do
         |]
     time <- iso8601ParseM "2021-10-10T00:00:00Z"
 
-    traverse currentResolvedRotationEffects confList
+    resolve confList
       & runTimeConst time
       & runOpsgenieFail
+      & runDeduplicationStoreNull
       & interpretLogNull
       & run
+      <&> second effects
       & ( `shouldMatchList`
             [ ( Set.fromList ["user-id"],
                 [ Slack
@@ -96,11 +103,13 @@ spec = do
         |]
     time <- iso8601ParseM "2021-10-10T00:00:00Z"
 
-    traverse currentResolvedRotationEffects confList
-      & runOpsgenieFail
+    resolve confList
       & runTimeConst time
+      & runOpsgenieFail
+      & runDeduplicationStoreNull
       & interpretLogNull
       & run
+      <&> second effects
       & ( `shouldMatchList`
             [ ( Set.fromList ["user-id-one"],
                 []
@@ -121,7 +130,7 @@ spec = do
         |]
     time <- iso8601ParseM "2021-10-10T00:00:00Z"
 
-    traverse currentResolvedRotationEffects confList
+    resolve confList
       & runOpsgenie
         ( \id ->
             if id == "schedule-id"
@@ -129,8 +138,10 @@ spec = do
               else error "Unexpected schedule ID"
         )
       & runTimeConst time
+      & runDeduplicationStoreNull
       & interpretLogNull
       & run
+      <&> second effects
       & ( `shouldMatchList`
             [ ( Set.fromList ["user@example.com"],
                 []
@@ -151,3 +162,8 @@ runTimeConst time = interpret \case
 
 parseConfList :: Text -> IO [Conf]
 parseConfList = runM . runConfig . Config.parse
+
+runDeduplicationStoreNull :: InterpreterFor DeduplicationStore r
+runDeduplicationStoreNull = interpret \case
+  IsAlreadyApplied _ -> return False
+  StoreAppliedContext _ -> return ()

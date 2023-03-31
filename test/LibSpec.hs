@@ -13,7 +13,7 @@ import Data.Map qualified as Map
 import Data.Text (Text, intercalate)
 import Data.Time.Clock (UTCTime)
 import Data.Time.Format.ISO8601 (iso8601ParseM)
-import DeduplicationStore (DeduplicationStore (IsAlreadyApplied, StoreAppliedContext))
+import DeduplicationStore (DeduplicationStore (..))
 import Effect (Effect (..))
 import Effect.Slack (SlackEffect (..))
 import IO (Time (..))
@@ -32,12 +32,7 @@ import Slack.Group (Group (..), Groups (..))
 import Slack.Group qualified as G (Groups (Create, Find))
 import Slack.User (User (..), Users (..))
 import Slack.User qualified as U (Users (Find, ListAll), email)
-import Test.Hspec
-  ( Spec,
-    describe,
-    it,
-    shouldBe,
-  )
+import Test.Hspec (Spec, describe, it, shouldBe)
 
 spec :: Spec
 spec = do

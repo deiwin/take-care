@@ -2,7 +2,7 @@ module ReadmeSpec (spec) where
 
 import Config
   ( Conf,
-    currentResolvedRotationEffects,
+    resolve,
     runConfig,
     showDryRun,
   )
@@ -37,7 +37,7 @@ spec = do
     confList <- readmeText >>= parseConfList
     time <- iso8601ParseM "2021-10-10T00:00:00Z"
 
-    traverse currentResolvedRotationEffects confList
+    resolve confList
       & runTimeConst time
       & runOpsgenieConst ["carol@example.com"]
       & interpretLogNull
@@ -111,7 +111,7 @@ spec = do
 
     result <- dryRunExample
 
-    traverse currentResolvedRotationEffects confList
+    resolve confList
       >>= showDryRun
       & runTimeConst time
       & runOpsgenieConst ["carol@example.com"]

@@ -2,7 +2,7 @@
 
 module ConfigSpec (spec) where
 
-import Config (Conf, currentResolvedRotationEffects, runConfig)
+import Config (Conf, resolve, runConfig)
 import Config qualified (parse)
 import Data.Function ((&))
 import Data.Set qualified as Set
@@ -21,7 +21,7 @@ import Polysemy.Log (interpretLogNull)
 
 spec :: Spec
 spec = do
-  it "returns no ResolvedRotationEffects for an empty list of effects" $ do
+  it "returns an empty list for an empty list of effects" $ do
     confList <-
       parseConfList
         [trimming|
@@ -34,7 +34,7 @@ spec = do
         |]
     time <- iso8601ParseM "2021-10-10T00:00:00Z"
 
-    traverse currentResolvedRotationEffects confList
+    resolve confList
       & runTimeConst time
       & runOpsgenieFail
       & interpretLogNull
@@ -65,7 +65,7 @@ spec = do
         |]
     time <- iso8601ParseM "2021-10-10T00:00:00Z"
 
-    traverse currentResolvedRotationEffects confList
+    resolve confList
       & runTimeConst time
       & runOpsgenieFail
       & interpretLogNull
@@ -96,7 +96,7 @@ spec = do
         |]
     time <- iso8601ParseM "2021-10-10T00:00:00Z"
 
-    traverse currentResolvedRotationEffects confList
+    resolve confList
       & runOpsgenieFail
       & runTimeConst time
       & interpretLogNull
@@ -121,7 +121,7 @@ spec = do
         |]
     time <- iso8601ParseM "2021-10-10T00:00:00Z"
 
-    traverse currentResolvedRotationEffects confList
+    resolve confList
       & runOpsgenie
         ( \id ->
             if id == "schedule-id"

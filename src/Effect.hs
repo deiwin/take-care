@@ -23,6 +23,7 @@ import Slack.User as User (Users)
 import Text.Printf (printf)
 import Text.Show.Functions ()
 import Prelude hiding (filter, lines, replicate, unlines)
+import Data.Hashable (Hashable)
 
 data Effect
   = Slack SlackEffect
@@ -30,6 +31,7 @@ data Effect
   deriving (Generic, Show, Eq)
 
 instance FromDhall Effect
+instance Hashable Effect
 
 apply ::
   ( Member (Error Text) r,

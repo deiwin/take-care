@@ -10,7 +10,7 @@ where
 import Config
   ( Config,
     apply,
-    currentResolvedRotationEffects,
+    resolve,
     runConfig,
     showDryRun,
   )
@@ -18,9 +18,13 @@ import Config qualified (parse)
 import Control.Category ((>>>))
 import Control.Lens ((^.))
 import Data.Text (Text, pack, unlines)
+import DeduplicationStore (DeduplicationStore, runDeduplicationStore)
+import DeduplicationStore qualified (DBCtx, runDBCtx)
 import IO (Env, Time, runEnv, runTime)
 import Log (runLog)
 import Log qualified as Log' (Effects)
+import Opsgenie (Opsgenie, runOpsgenie)
+import Opsgenie qualified (NetCtx, runNetCtx)
 import Polysemy (Embed, Final, Member, Members, Sem, embedToFinal, runFinal)
 import Polysemy.Error (Error, errorToIOFinal)
 import Polysemy.Input (Input)
@@ -36,8 +40,6 @@ import Slack.Util (Slack, runSlack)
 import Slack.Util qualified as Slack (NetCtx, runNetCtx)
 import Text.Printf (printf)
 import Text.Show.Functions ()
-import Opsgenie (Opsgenie, runOpsgenie)
-import Opsgenie qualified (NetCtx, runNetCtx)
 import Prelude hiding (filter, unlines)
 
 type family (++) (as :: [k]) (bs :: [k]) :: [k] where
@@ -56,6 +58,8 @@ type CanonicalEffects =
           Input Slack.NetCtx,
           Opsgenie,
           Input Opsgenie.NetCtx,
+          DeduplicationStore,
+          Input DeduplicationStore.DBCtx,
           Env,
           Error Text
         ]
@@ -75,6 +79,8 @@ runCanonical =
     >>> Slack.runNetCtx
     >>> runOpsgenie
     >>> Opsgenie.runNetCtx
+    >>> runDeduplicationStore
+    >>> DeduplicationStore.runDBCtx
     >>> runEnv
     >>> errorToIOFinal
     >>> runLog
@@ -89,6 +95,7 @@ ensure ::
     Member Channels r,
     Member Users r,
     Member Groups r,
+    Member DeduplicationStore r,
     Member Log r
   ) =>
   Text ->
@@ -97,9 +104,9 @@ ensure inputText = do
   Log.info "Parsing configuration .."
   confList <- Config.parse inputText
   Log.info "Resolving rotation effects .."
-  resolvedRotationEffectsList <- traverse currentResolvedRotationEffects confList
+  resolvedConf <- resolve confList
   Log.info "Applying all configurations .."
-  apply resolvedRotationEffectsList
+  apply resolvedConf
   Log.info "Completed applying all configurations"
 
 dryRunEnsure ::
@@ -108,6 +115,7 @@ dryRunEnsure ::
     Member (Error Text) r,
     Member Opsgenie r,
     Member Users r,
+    Member DeduplicationStore r,
     Member Log r
   ) =>
   Text ->
@@ -116,9 +124,9 @@ dryRunEnsure inputText = do
   Log.info "Parsing configuration .."
   confList <- Config.parse inputText
   Log.info "Resolving rotation effects .."
-  resolvedRotationEffectsList <- traverse currentResolvedRotationEffects confList
+  resolvedConf <- resolve confList
   Log.info "Showing resolved rotation effects .."
-  showDryRun resolvedRotationEffectsList
+  showDryRun resolvedConf
 
 listUsers :: Members '[Users, Log] r => Sem r Text
 listUsers = do

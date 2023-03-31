@@ -64,6 +64,8 @@ library:
   - time
   - wreq
   - containers
+  - sqlite-simple
+  - hashable
 
 executables:
   take-care:

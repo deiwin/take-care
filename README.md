@@ -158,6 +158,28 @@ The `ensure` command _ensures_ that
   - exist and
   - consist of the current caretakers (one per caretaker list per team).
 
+## Confiuration options
+
+- `SLACK_API_TOKEN`: Access token for Slack APIs. Currently required for all
+  use-cases. See [Getting a Slack API token](#getting-a-slack-api-token) below
+  for instructions on how to get the token.
+- `OPSGENIE_API_TOKEN`: Access token for Opsgenie APIs. Only required when
+  using the `OpsgenieScheduleID` rotation. See [Getting an Opsgenie API
+  token](#getting-an-opsgenie-api-token) below for instructions.
+- `PERSISTENT_FOLDER_PATH`: An optional env variable. Setting this env variable
+  enables deduplication.
+  - If enabled, each configuration is applied only once. Every time the script
+    runs it checks whether it has already applied a particular configuration
+    and avoids re-applying it if has already been applied in the past with the
+    same parameters (e.g. same result from resolving the rotation).
+  - This is useful if you run the bot at a frequent schedule (e.g. every 5
+    minutes). Deduplication avoids unnecessary API calls and avoids reverting
+    any manual changes people have made since the last execution (e.g. manually
+    changing Slack User Groups or Channel Topics).
+  - Setting the variable to an empty string will mean that the current folder
+    will be used.
+  - Leaving this environment variable unset disables this functionality.
+
 ## Getting a Slack API token
 
 - Follow the [Creating apps Slack guide][4] to create a Slack app. You can call

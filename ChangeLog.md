@@ -2,10 +2,15 @@
 
 ## Unreleased changes
 
-* Add a OpsgenieScheduleID rotation. The new rotation pulls from Opsgenie the
+* Add deduplication. If deduplication is enabled, the bot "remembers" the
+  configurations it has already applied and will not apply the same
+  configuration again unless something changes. The feature is disabled by
+  default. Set the `PERSISTENT_FOLDER_PATH` environment variable to a folder
+  for storing the DB to enable this feature.
+* Add a `OpsgenieScheduleID` rotation. The new rotation pulls from Opsgenie the
   list of emails of whoever is on call currently for the specified schedule.
-  Requires OPSGENIE_API_TOKEN env variable.
-* Rename API_TOKEN env variable to SLACK_API_TOKEN.
+  Requires `OPSGENIE_API_TOKEN` env variable.
+* Rename `API_TOKEN` env variable to `SLACK_API_TOKEN`.
 
 ## v0.6.2
 

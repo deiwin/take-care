@@ -75,6 +75,7 @@ let Rotation = ./types/core/Rotation.dhall
              ? https://github.com/deiwin/take-care/raw/v0.6.2/types/core/Rotation.dhall
 let teams = ./types/zoo/teams.dhall
           ? https://github.com/deiwin/take-care/raw/v0.6.2/types/zoo/teams.dhall
+let concatSep = https://raw.githubusercontent.com/dhall-lang/dhall-lang/v21.1.0/Prelude/Text/concatSep.dhall
  in teams
       [ { members =
           { caretakers = [ [ "alice@example.com", "bob@example.com" ] ]
@@ -102,6 +103,12 @@ let teams = ./types/zoo/teams.dhall
       ]
     # [ { rotation = Rotation.OpsgenieScheduleID "123e4567-e89b-12d3-a456-426614174000"
         , effects = [ Effect.Slack
+                        ( SlackEffect.SetChannelTopic
+                          { name = "tm-platform"
+                          , topic = \(caretakers : List Text) -> "Caretaker(s): ${concatSep ", " caretakers}"
+                          }
+                        )
+                    , Effect.Slack
                         ( SlackEffect.SetGroup
                           { handle = "platform-caretaker"
                           , name = "Platform team caretaker(s)"
@@ -132,6 +139,7 @@ For eve@example.com, faye@example.com, gil@example.com, hal@example.com:
   Slack.SetGroup: @dev-team {name = "Team dev", channels = ["tm-dev"]}
 
 For carol@example.com:
+  Slack.SetChannelTopic #tm-platform: Caretaker(s): @carol
   Slack.SetGroup: @platform-caretaker {name = "Platform team caretaker(s)", channels = ["tm-platform"]}
 ```
 

@@ -100,6 +100,11 @@ spec = do
               ),
               ( Set.fromList ["carol@example.com"],
                 [ Slack
+                    SetChannelTopic
+                      { name = "tm-platform",
+                        topic = \members -> "Caretaker(s): " <> intercalate ", " members
+                      }
+                , Slack
                     SetGroup
                       { handle = "platform-caretaker",
                         name = "Platform team caretaker(s)",

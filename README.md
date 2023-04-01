@@ -68,13 +68,13 @@ programmable configuration language with Haskell-like syntax.
 
 ```haskell
 let SlackEffect = ./types/core/Effect/Slack.dhall
-                ? https://github.com/deiwin/take-care/raw/v0.6.2/types/core/Effect/Slack.dhall
+                ? https://github.com/deiwin/take-care/raw/v0.7.0/types/core/Effect/Slack.dhall
 let Effect = ./types/core/Effect.dhall
-           ? https://github.com/deiwin/take-care/raw/v0.6.2/types/core/Effect.dhall
+           ? https://github.com/deiwin/take-care/raw/v0.7.0/types/core/Effect.dhall
 let Rotation = ./types/core/Rotation.dhall
-             ? https://github.com/deiwin/take-care/raw/v0.6.2/types/core/Rotation.dhall
+             ? https://github.com/deiwin/take-care/raw/v0.7.0/types/core/Rotation.dhall
 let teams = ./types/zoo/teams.dhall
-          ? https://github.com/deiwin/take-care/raw/v0.6.2/types/zoo/teams.dhall
+          ? https://github.com/deiwin/take-care/raw/v0.7.0/types/zoo/teams.dhall
 let concatSep = https://raw.githubusercontent.com/dhall-lang/dhall-lang/v21.1.0/Prelude/Text/concatSep.dhall
  in teams
       [ { members =

@@ -2,6 +2,8 @@
 
 ## Unreleased changes
 
+## v0.7.0
+
 * Add deduplication. If deduplication is enabled, the bot "remembers" the
   configurations it has already applied and will not apply the same
   configuration again unless something changes. The feature is disabled by

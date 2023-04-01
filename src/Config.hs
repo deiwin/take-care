@@ -25,7 +25,6 @@ import Data.Hashable (Hashable (hash))
 import Data.Set (Set)
 import Data.Set qualified as Set
 import Data.Text (Text, intercalate, lines, pack, replicate)
-import Data.Time (addDays)
 import Data.Time.Calendar.WeekDate (toWeekDate)
 import Data.Time.Clock (UTCTime (..))
 import DeduplicationStore (DeduplicationContext (..), DeduplicationStore (..), isAlreadyApplied, storeAppliedContext)
@@ -83,13 +82,12 @@ apply ::
   ) =>
   [ResolvedConf] ->
   Sem r ()
-apply = traverse_ (uncurry applyGroup)
+apply = traverse_ applyGroup
   where
-    applyGroup members conf@Conf{effects} = do
+    applyGroup resolvedConf@(members, Conf {effects}) = do
       Log.info "Applying all effects for a rotation .."
       traverse_ (Effect.apply members) effects
-      ctx <- deduplicationContext conf
-      maybe (return ()) storeAppliedContext ctx
+      storeAppliedContext $ deduplicationContext resolvedConf
 
 showDryRun ::
   ( Member (Error Text) r,
@@ -102,7 +100,7 @@ showDryRun resolvedConf =
     & traverse showGroup
     <&> intercalate "\n\n"
   where
-    showGroup (members, Conf{effects}) = interUnlines <$> sequence lines
+    showGroup (members, Conf {effects}) = interUnlines <$> sequence lines
       where
         lines = memberLine : effectLines
         memberLine =
@@ -124,12 +122,8 @@ resolve ::
   Sem r [ResolvedConf]
 resolve confList =
   confList
-    & filterM (fmap not . shouldExclude)
-    >>= traverse currentResolvedConf
-  where
-    shouldExclude conf =
-      deduplicationContext conf
-        >>= maybe (return False) isAlreadyApplied
+    & traverse currentResolvedConf
+    >>= filterM (fmap not . isAlreadyApplied . deduplicationContext)
 
 currentResolvedConf ::
   ( Member Time r,
@@ -165,29 +159,17 @@ resolveRotation = \case
     Log.info (pack (printf "Resolved OpsgenieScheduleID rotation. Current members are: %s" (show currentMembers)))
     return currentMembers
 
-deduplicationContext ::
-  ( Member Time r
-  ) =>
-  Conf ->
-  Sem r (Maybe DeduplicationContext)
-deduplicationContext (Conf {..}) =
-  case rotation of
-    Const _ -> return Nothing
-    OpsgenieScheduleID _ -> return Nothing
-    Weekly input -> do
-      let effectsHash = pack $ show $ hash effects
-      let inputHash = pack $ show $ hash input
-      validUntil <- nextWeek <$> Time.getCurrent
-      return (Just (DeduplicationContext {..}))
-
-nextWeek :: UTCTime -> UTCTime
-nextWeek time = UTCTime newDay 0
+deduplicationContext :: ResolvedConf -> DeduplicationContext
+deduplicationContext (output, Conf {..}) = DeduplicationContext {..}
   where
-    day = utctDay time
-    (_, _, weekDay) = toWeekDate day
-    -- weekDay is a value between 1 (Monday) and 7 (Sunday). Add however much
-    -- is needed to get to the next Monday.
-    newDay = addDays (fromIntegral (8 - weekDay)) day
+    effectsHash = pack $ show $ hash effects
+    inputHash = pack $ show inputHash'
+    inputHash' =
+      case rotation of
+        Const input -> hash input
+        OpsgenieScheduleID input -> hash input
+        Weekly input -> hash input
+    outputHash = pack $ show $ hash output
 
 currentCaretaker :: UTCTime -> [Text] -> Text
 currentCaretaker time candidates = cycle candidates !! utcWeek

@@ -5,8 +5,10 @@ module ConfigSpec (spec) where
 import Config (Conf (..), Rotation (..), apply, resolve, runConfig)
 import Config qualified (parse)
 import Control.Arrow (second)
+import Control.Lens ((^.))
 import Data.Function ((&))
 import Data.Functor ((<&>))
+import Data.List (find)
 import Data.Map (Map)
 import Data.Map qualified as Map
 import Data.Set qualified as Set
@@ -22,13 +24,13 @@ import Opsgenie (Opsgenie (..))
 import Polysemy (InterpreterFor, InterpretersFor, Member, Sem, interpret, run, runM)
 import Polysemy.Error (runError)
 import Polysemy.Log (interpretLogNull)
-import Polysemy.State (State, get, modify, runState)
+import Polysemy.State (State, get, modify, put, runState)
 import Slack.Channel (Channel (..), Channels (..))
 import Slack.Channel qualified as C (Channels (Create, Find))
 import Slack.Group (Group (..), Groups (..))
 import Slack.Group qualified as G (Groups (Create, Find))
-import Slack.User (Users (..))
-import Slack.User qualified as U (Users (Find, ListAll))
+import Slack.User (User (..), Users (..))
+import Slack.User qualified as U (Users (Find, ListAll), email)
 import Test.Hspec (Spec, describe, it, shouldBe, shouldMatchList)
 import Prelude hiding (lines, readFile, unlines)
 
@@ -160,19 +162,37 @@ spec = do
         )
 
   describe "deduplication" $ do
-    it "checks and filters out already applied Weekly rotations" $ do
+    it "checks and filters out all already applied rotations" $ do
       let confList =
             [ Conf
                 { rotation = Weekly [["weekly@example.com"]],
-                  effects = []
+                  effects =
+                    [ Slack
+                        SetChannelTopic
+                          { name = "weekly-channel",
+                            topic = const "weekly"
+                          }
+                    ]
                 },
               Conf
                 { rotation = Const ["const@example.com"],
-                  effects = []
+                  effects =
+                    [ Slack
+                        SetChannelTopic
+                          { name = "const-channel",
+                            topic = const "const"
+                          }
+                    ]
                 },
               Conf
                 { rotation = OpsgenieScheduleID "schedule-id",
-                  effects = []
+                  effects =
+                    [ Slack
+                        SetChannelTopic
+                          { name = "opsgenie-channel",
+                            topic = const "opsgenie"
+                          }
+                    ]
                 }
             ]
       time <- iso8601ParseM "2021-10-10T00:00:00Z"
@@ -183,30 +203,40 @@ spec = do
         & runDeduplicationStoreConst True
         & interpretLogNull
         & run
-        <&> second effects
-        & ( `shouldMatchList`
-              [ ( Set.fromList ["const@example.com"],
-                  []
-                ),
-                ( Set.fromList ["opsgenie@example.com"],
-                  []
-                )
-              ]
-          )
+        <&> fst
+        & (`shouldBe` [])
 
     it "deduplicates subsequent runs of same conf for Weekly rotations" $ do
       let confList =
             [ Conf
                 { rotation = Weekly [["weekly@example.com"]],
-                  effects = []
+                  effects =
+                    [ Slack
+                        SetChannelTopic
+                          { name = "weekly-channel",
+                            topic = const "weekly"
+                          }
+                    ]
                 },
               Conf
                 { rotation = Const ["const@example.com"],
-                  effects = []
+                  effects =
+                    [ Slack
+                        SetChannelTopic
+                          { name = "const-channel",
+                            topic = const "const"
+                          }
+                    ]
                 },
               Conf
                 { rotation = OpsgenieScheduleID "schedule-id",
-                  effects = []
+                  effects =
+                    [ Slack
+                        SetChannelTopic
+                          { name = "opsgenie-channel",
+                            topic = const "opsgenie"
+                          }
+                    ]
                 }
             ]
       time <- iso8601ParseM "2021-10-10T00:00:00Z"
@@ -215,14 +245,18 @@ spec = do
             firstResolve <- resolve confList
             apply firstResolve
             secondResolve <- resolve confList
-            return (fmap (second effects) firstResolve, fmap (second effects) secondResolve)
+            return (fmap fst firstResolve, fmap fst secondResolve)
 
       program
         & runOpsgenie (\_ -> return ["opsgenie@example.com"])
         & runTimeConst time
         & runDeduplicationStoreInMemory
         & runChannelsNull
-        & runUsersNull
+        & runUsersConst
+          [ User {_id = "1", _displayName = "Weekly", _email = "weekly@example.com"},
+            User {_id = "2", _displayName = "Const", _email = "const@example.com"},
+            User {_id = "3", _displayName = "Opsgenie", _email = "opsgenie@example.com"}
+          ]
         & runGroupsNull
         & runError
         & interpretLogNull
@@ -230,24 +264,122 @@ spec = do
         & ( `shouldBe`
               Right
                 ( [ -- First time
-                    ( Set.fromList ["weekly@example.com"],
-                      []
-                    ),
-                    ( Set.fromList ["const@example.com"],
-                      []
-                    ),
-                    ( Set.fromList ["opsgenie@example.com"],
-                      []
-                    )
+                    Set.fromList ["weekly@example.com"],
+                    Set.fromList ["const@example.com"],
+                    Set.fromList ["opsgenie@example.com"]
                   ],
-                  [ -- Second time
-                    ( Set.fromList ["const@example.com"],
-                      []
-                    ),
-                    ( Set.fromList ["opsgenie@example.com"],
-                      []
-                    )
-                  ]
+                  [] -- Second time
+                )
+          )
+
+    it "applies Weekly conf again after the week changes" $ do
+      let confList =
+            [ Conf
+                { rotation = Weekly [["one@example.com", "two@example.com"]],
+                  effects = []
+                }
+            ]
+
+      initialTime <- iso8601ParseM "2021-10-10T00:00:00Z"
+      secondTime <- iso8601ParseM "2021-10-17T00:00:00Z"
+      let program = do
+            firstResolve <- resolve confList
+            apply firstResolve
+
+            put secondTime
+
+            secondResolve <- resolve confList
+            return (fmap fst firstResolve, fmap fst secondResolve)
+
+      program
+        & runOpsgenieFail
+        & runTimeState
+        & fmap snd . runState initialTime
+        & runDeduplicationStoreInMemory
+        & runChannelsNull
+        & runUsersConst
+          [ User {_id = "1", _displayName = "One", _email = "one@example.com"},
+            User {_id = "2", _displayName = "Two", _email = "two@example.com"}
+          ]
+        & runGroupsNull
+        & runError
+        & interpretLogNull
+        & run
+        & ( `shouldBe`
+              Right
+                ( [Set.fromList ["one@example.com"]], -- First time
+                  [Set.fromList ["two@example.com"]] -- Second time
+                )
+          )
+
+    it "applies Const conf again after the input changes" $ do
+      let initialConfList = [Conf {rotation = Const ["one@example.com"], effects = []}]
+      let secondConfList = [Conf {rotation = Const ["two@example.com"], effects = []}]
+
+      time <- iso8601ParseM "2021-10-10T00:00:00Z"
+
+      let program = do
+            firstResolve <- resolve initialConfList
+            apply firstResolve
+
+            secondResolve <- resolve secondConfList
+            return (fmap fst firstResolve, fmap fst secondResolve)
+
+      program
+        & runOpsgenieFail
+        & runTimeConst time
+        & runDeduplicationStoreInMemory
+        & runChannelsNull
+        & runUsersConst
+          [ User {_id = "1", _displayName = "One", _email = "one@example.com"},
+            User {_id = "2", _displayName = "Two", _email = "two@example.com"}
+          ]
+        & runGroupsNull
+        & runError
+        & interpretLogNull
+        & run
+        & ( `shouldBe`
+              Right
+                ( [Set.fromList ["one@example.com"]], -- First time
+                  [Set.fromList ["two@example.com"]] -- Second time
+                )
+          )
+
+    it "applies Opsgenie conf again after the information returned from Opsgenie changes" $ do
+      let confList = [Conf {rotation = OpsgenieScheduleID "schedule-id", effects = []}]
+
+      time <- iso8601ParseM "2021-10-10T00:00:00Z"
+
+      let initialResponse = ["one@example.com"]
+      let secondResponse = ["two@example.com"]
+
+      let program = do
+            firstResolve <- resolve confList
+            apply firstResolve
+
+            put secondResponse
+
+            secondResolve <- resolve confList
+            return (fmap fst firstResolve, fmap fst secondResolve)
+
+      program
+        & runOpsgenieState
+        & fmap snd . runState initialResponse
+        & runTimeConst time
+        & runDeduplicationStoreInMemory
+        & runChannelsNull
+        & runUsersConst
+          [ User {_id = "1", _displayName = "One", _email = "one@example.com"},
+            User {_id = "2", _displayName = "Two", _email = "two@example.com"}
+          ]
+        & runGroupsNull
+        & runError
+        & interpretLogNull
+        & run
+        & ( `shouldBe`
+              Right
+                ( [Set.fromList ["one@example.com"]], -- First time
+                  [Set.fromList ["two@example.com"]] -- Second time
                 )
           )
 
@@ -257,10 +389,10 @@ runChannelsNull = interpret \case
   SetTopic _id _topic -> return ()
   C.Find _name -> return Nothing
 
-runUsersNull :: InterpreterFor Users r
-runUsersNull = interpret \case
-  U.Find _emailToFind -> return Nothing
-  U.ListAll -> return []
+runUsersConst :: [User] -> InterpreterFor Users r
+runUsersConst users = interpret \case
+  U.Find emailToFind -> return $ find ((== emailToFind) . (^. U.email)) users
+  U.ListAll -> return users
 
 runGroupsNull :: InterpreterFor Groups r
 runGroupsNull = interpret \case
@@ -278,9 +410,17 @@ runOpsgenie :: (Text -> Sem r [Text]) -> InterpreterFor Opsgenie r
 runOpsgenie f = interpret \case
   WhoIsOnCall scheduleID -> f scheduleID
 
+runOpsgenieState :: (Member (State [Text]) r) => InterpreterFor Opsgenie r
+runOpsgenieState = interpret \case
+  WhoIsOnCall _scheduleID -> get
+
 runTimeConst :: UTCTime -> InterpreterFor Time r
 runTimeConst time = interpret \case
   GetCurrent -> return time
+
+runTimeState :: (Member (State UTCTime) r) => InterpreterFor Time r
+runTimeState = interpret \case
+  GetCurrent -> get
 
 parseConfList :: Text -> IO [Conf]
 parseConfList = runM . runConfig . Config.parse
@@ -300,6 +440,5 @@ runDeduplicationStoreInMemory = fmap snd . runState Map.empty . interpreter
       IsAlreadyApplied ctx ->
         get
           <&> Map.lookup (effectsHash ctx)
-          <&> maybe False (sameAs ctx)
+          <&> (== Just ctx)
       StoreAppliedContext ctx -> modify $ Map.insert (effectsHash ctx) ctx
-    sameAs a b = (effectsHash a, inputHash a) == (effectsHash b, inputHash b)

@@ -11,7 +11,6 @@ where
 
 import Data.Function ((&))
 import Data.Text (Text, pack)
-import Data.Time.Clock (UTCTime (..))
 import Database.SQLite.Simple (Connection, Only (Only), ToRow (toRow), changes, execute, execute_, open, query)
 import IO (Env)
 import IO qualified as Env (lookup)
@@ -23,19 +22,15 @@ import Polysemy.Log (Log)
 import Polysemy.Log qualified as Log (info)
 import Text.Printf (printf)
 
-type EffectsHash = Text
-
-type InputHash = Text
-
 data DeduplicationContext = DeduplicationContext
-  { effectsHash :: EffectsHash,
-    inputHash :: InputHash,
-    validUntil :: UTCTime
+  { effectsHash :: Text,
+    inputHash :: Text,
+    outputHash :: Text
   }
-  deriving (Show)
+  deriving (Eq, Show)
 
 instance ToRow DeduplicationContext where
-  toRow (DeduplicationContext {..}) = toRow (effectsHash, inputHash, validUntil)
+  toRow (DeduplicationContext {..}) = toRow (effectsHash, inputHash, outputHash)
 
 data DeduplicationStore m a where
   IsAlreadyApplied :: DeduplicationContext -> DeduplicationStore m Bool
@@ -64,9 +59,17 @@ runDeduplicationStore = interpret \case
               "SELECT COUNT(1) FROM deduplication_store\
               \ WHERE effects_hash = ?\
               \ AND input_hash = ?\
-              \ AND unixepoch(valid_until) > unixepoch()"
-              (effectsHash, inputHash)
+              \ AND output_hash = ?"
+              (effectsHash, inputHash, outputHash)
         Log.info (pack (printf "Found %d match(es)" count))
+        Log.info "Updating last_accessed_at for given effects_hash to avoid it being garbage collected"
+        embed $
+          execute
+            connection
+            "UPDATE deduplication_store\
+            \ SET last_accessed_at = datetime()\
+            \ WHERE effects_hash = ?"
+            (Only effectsHash)
         return (count >= (1 :: Int))
   StoreAppliedContext ctx -> do
     dbCtxM <- input
@@ -78,11 +81,12 @@ runDeduplicationStore = interpret \case
           execute
             connection
             "INSERT INTO deduplication_store\
-            \   (effects_hash, input_hash, valid_until)\
-            \   VALUES (?,?,?)\
+            \   (effects_hash, input_hash, output_hash, last_accessed_at)\
+            \   VALUES (?,?,?,datetime())\
             \ ON CONFLICT(effects_hash) DO UPDATE SET\
             \   input_hash = excluded.input_hash,\
-            \   valid_until = excluded.valid_until"
+            \   output_hash = excluded.output_hash,\
+            \   last_accessed_at = excluded.last_accessed_at"
             ctx
 
 type DBCtx = Maybe DBCtx'
@@ -130,10 +134,14 @@ initializeDB conn = do
       "CREATE TABLE IF NOT EXISTS deduplication_store (\
       \  effects_hash TEXT PRIMARY KEY,\
       \  input_hash TEXT NOT NULL,\
-      \  valid_until TEXT NOT NULL\
+      \  output_hash TEXT NOT NULL,\
+      \  last_accessed_at TEXT NOT NULL\
       \)"
 
-  Log.info "Deleting expired rows to avoid unbounded DB growth .."
-  embed $ execute_ conn "DELETE FROM deduplication_store WHERE unixepoch(valid_until) < unixepoch()"
+  Log.info "Deleting old, unused rows to avoid unbounded DB growth .."
+  embed $
+    execute_
+      conn
+      "DELETE FROM deduplication_store WHERE unixepoch(last_accessed_at) < unixepoch('now', '-14 days')"
   deletedCount <- embed $ changes conn
   Log.info (pack (printf "Deleted %d rows .." deletedCount))

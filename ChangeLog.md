@@ -9,6 +9,12 @@
   back to using `$HOME/.cache` (`/root/.cache`) as it did previously. This
   change allows the cache to still be used even if the home folder is
   overwritten by a volume mount, for example.
+* Retry Slack requests when hitting rate limits. All requests will be tried
+  again (up to a handful of times) after the duration specificied in the
+  `Retry-After` header. This can make the bot slower in case it starts hitting
+  rate limits but it avoids unnecessary failures. The amount of requests is
+  already kept to a minimum with different caching and deduplication
+  mechanisms, but multiple invocations can still trigger rate limits.
 
 ## v0.7.0
 

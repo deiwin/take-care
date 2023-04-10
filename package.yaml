@@ -66,6 +66,7 @@ library:
   - containers
   - sqlite-simple
   - hashable
+  - http-client
 
 executables:
   take-care:

@@ -15,23 +15,29 @@ module Slack.Util
 where
 
 import Control.Category ((>>>))
+import Control.Concurrent (threadDelay)
 import Control.Lens ((&), (.~), (?~), (^.), (^?), (^?!))
 import Control.Monad (mfilter)
 import Data.Aeson (FromJSON, Value, object, toJSON)
 import Data.Aeson qualified as A (fromJSON)
-import Data.Aeson.Lens (key, _Bool, _String)
+import Data.Aeson.Lens (key, _Bool, _Integral, _String)
 import Data.Aeson.Types (Pair, Result (Error, Success))
 import Data.ByteString (ByteString)
 import Data.ByteString.Char8 qualified as BS (pack)
+import Data.Functor ((<&>))
 import Data.Maybe (maybeToList)
 import Data.Text as T (Text, null, pack)
 import IO (Env)
 import IO qualified as Env (lookup)
-import Network.Wreq (Options, Response, asValue, auth, defaults, oauth2Bearer, param, responseBody)
+import Network.HTTP.Client (HttpException (..), HttpExceptionContent (..))
+import Network.Wreq (Options, Response, asValue, auth, defaults, oauth2Bearer, param, responseBody, responseHeader, responseStatus, statusCode)
 import Network.Wreq.Session (Session, getWith, newAPISession, postWith)
 import Polysemy (Embed, InterpreterFor, Member, Sem, embed, interpret, makeSem)
-import Polysemy.Error (Error, note, throw)
+import Polysemy.Error (Error, catch, fromException, mapError, note, throw)
 import Polysemy.Input (Input, input, runInputConst)
+import Polysemy.Log (Log)
+import Polysemy.Log qualified as Log (warn)
+import Text.Printf (printf)
 import Prelude hiding (lookup)
 
 data NetCtx = NetCtx ByteString Session
@@ -58,7 +64,8 @@ makeSem ''Slack
 runSlack ::
   ( Member (Embed IO) r,
     Member (Input NetCtx) r,
-    Member (Error Text) r
+    Member (Error Text) r,
+    Member Log r
   ) =>
   InterpreterFor Slack r
 runSlack = interpret \case
@@ -72,7 +79,8 @@ slackURL = ("https://slack.com/api/" ++)
 slackGet ::
   ( Member (Embed IO) r,
     Member (Input NetCtx) r,
-    Member (Error Text) r
+    Member (Error Text) r,
+    Member Log r
   ) =>
   Options ->
   String ->
@@ -81,13 +89,17 @@ slackGet opts method = do
   (NetCtx apiToken sess) <- input @NetCtx
   let optsWithAuth = opts & auth ?~ oauth2Bearer apiToken
   let url = slackURL method
-  resp <- embed (asValue =<< getWith optsWithAuth sess url)
+  resp <-
+    getWith optsWithAuth sess url
+      >>= asValue
+      & retryRateLimit
   handleSlackError "GET" method resp
 
 slackGetPaginated ::
   ( Member (Embed IO) r,
     Member (Input NetCtx) r,
-    Member (Error Text) r
+    Member (Error Text) r,
+    Member Log r
   ) =>
   Options ->
   String ->
@@ -97,7 +109,8 @@ slackGetPaginated = slackGetPaginated' Nothing []
 slackGetPaginated' ::
   ( Member (Embed IO) r,
     Member (Input NetCtx) r,
-    Member (Error Text) r
+    Member (Error Text) r,
+    Member Log r
   ) =>
   Maybe Text ->
   [Value] ->
@@ -116,7 +129,8 @@ slackGetPaginated' cursor !acc opts method = do
 slackPost ::
   ( Member (Embed IO) r,
     Member (Input NetCtx) r,
-    Member (Error Text) r
+    Member (Error Text) r,
+    Member Log r
   ) =>
   [Pair] ->
   String ->
@@ -126,7 +140,10 @@ slackPost params method = do
   let optsWithAuth = defaults & auth ?~ oauth2Bearer apiToken
   let url = slackURL method
   let body = toJSON $ object params
-  resp <- embed $ asValue =<< postWith optsWithAuth sess url body
+  resp <-
+    postWith optsWithAuth sess url body
+      >>= asValue
+      & retryRateLimit
   handleSlackError "POST" method resp
 
 handleSlackError ::
@@ -143,6 +160,56 @@ handleSlackError httpMethod method resp =
    in if ok
         then return respBody
         else throw (httpMethod <> " " <> T.pack method <> ": " <> errorMessage <> maybe "" (" - " <>) detail)
+
+retryRateLimit ::
+  ( Member (Embed IO) r,
+    Member (Error Text) r,
+    Member Log r
+  ) =>
+  IO (Response a) ->
+  Sem r (Response a)
+retryRateLimit = go (replicate 4 ()) -- 4 retries, meaning 5 tries in total
+  where
+    go [] requestM =
+      requestM
+        & fromException
+        & mapError httpToText
+    go (_ : rest) requestM = do
+      requestM
+        & fromException
+        & flip catch (catchRateLimited rest requestM)
+        & mapError httpToText
+
+    httpToText :: HttpException -> Text
+    httpToText = T.pack . show
+
+    catchRateLimited ::
+      ( Member (Embed IO) r,
+        Member (Error Text) r,
+        Member (Error HttpException) r,
+        Member Log r
+      ) =>
+      [()] ->
+      IO (Response a) ->
+      HttpException ->
+      Sem r (Response a)
+    catchRateLimited rest requestM e@(HttpExceptionRequest _ (StatusCodeException resp _body)) = do
+      if isRateLimited resp
+        then do
+          duration <- waitDuration resp
+          Log.warn (T.pack (printf "The request was ratelimited. Waiting %d seconds before trying again .." duration))
+          wait duration
+          go rest requestM
+        else throw e
+    catchRateLimited _ _ e = throw e
+
+    isRateLimited r = (r ^. responseStatus . statusCode) == 429
+    wait durationSeconds = embed $ threadDelay (durationSeconds * 1000000)
+    waitDuration r =
+      retryAfter r
+        & note "Expected a Retry-After header but could not find it."
+        <&> (+ 5) -- A small buffer
+    retryAfter r = r ^? responseHeader "Retry-After" . _Integral
 
 fromJSON ::
   ( FromJSON a,

@@ -2,6 +2,8 @@
 
 ## Unreleased changes
 
+## v0.7.1
+
 * Use `/app/.cache` as the cache folder by default, falling back to the
   previous `/root/.cache` if necessary. For this, the Dhall cache is copied to
   both folders and then the `XDG_CACHE_HOME` env variable in the image is set

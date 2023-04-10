@@ -34,6 +34,12 @@ WORKDIR /app
 
 COPY --from=builder /root/.local/bin/take-care /usr/local/bin/
 COPY --from=builder /app/types /app/types
+
+ENV XDG_CACHE_HOME /app/.cache
+COPY --from=builder /root/.cache/dhall $XDG_CACHE_HOME/dhall
+COPY --from=builder /root/.cache/dhall-haskell $XDG_CACHE_HOME/dhall-haskell
+# Also provide cache in $HOME/.cache as a fallback, in case the env variable
+# gets overwritten.
 COPY --from=builder /root/.cache/dhall /root/.cache/dhall
 COPY --from=builder /root/.cache/dhall-haskell /root/.cache/dhall-haskell
 

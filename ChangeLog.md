@@ -2,6 +2,14 @@
 
 ## Unreleased changes
 
+* Use `/app/.cache` as the cache folder by default, falling back to the
+  previous `/root/.cache` if necessary. For this, the Dhall cache is copied to
+  both folders and then the `XDG_CACHE_HOME` env variable in the image is set
+  explicitly to `/app/.cache`. If this env variable is unset, then it will fall
+  back to using `$HOME/.cache` (`/root/.cache`) as it did previously. This
+  change allows the cache to still be used even if the home folder is
+  overwritten by a volume mount, for example.
+
 ## v0.7.0
 
 * Add deduplication. If deduplication is enabled, the bot "remembers" the
